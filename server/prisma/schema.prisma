@@ -1,0 +1,927 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  COLLEGE_ADMIN
+  TEACHER
+  STUDENT
+}
+
+// Self-registered teachers stay PENDING until a College Admin approves them.
+enum UserStatus {
+  PENDING
+  ACTIVE
+}
+
+// Students see PUBLISHED courses only. ARCHIVED courses are kept but hidden from students.
+enum CourseLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonType {
+  TEXT
+  VIDEO
+  DOCUMENT
+}
+
+enum InstructorRole {
+  OWNER
+  CO_INSTRUCTOR
+}
+
+enum FilePurpose {
+  VIDEO
+  DOCUMENT
+  IMAGE
+}
+
+// TEXT = plain text shown as written; MARKDOWN = formatted (headings, lists, code, tables, images).
+enum ContentFormat {
+  TEXT
+  MARKDOWN
+}
+
+model RoleMaster {
+  id              Int                  @id @map("role_id")
+  code            Role                 @unique @map("role_code")
+  name            String               @map("role_name")
+  users           User[]
+  menuPermissions RoleMenuPermission[]
+  createdAt       DateTime             @default(now()) @map("i_ts")
+  updatedAt       DateTime?            @map("u_ts")
+  createdBy       String?              @map("crte_usr_id")
+  updatedBy       String?              @map("updte_usr_id")
+  activeIndicator Int                  @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?            @map("d_ts")
+
+  @@unique([id, code])
+  @@map("role_t")
+}
+
+// Sidebar menu items and the permission objects behind them (APCMMS app_mnu_itm_lst_t style).
+// code is the key used by requirePermission(); headers (hdr_in = 1) group children; shw_in = 0 keeps
+// a permission object (for example enrollments) out of the sidebar.
+model MenuItem {
+  id              Int                  @id @default(autoincrement()) @map("mnu_itm_id")
+  code            String               @unique @map("mnu_itm_cd")
+  name            String               @map("mnu_itm_nm")
+  description     String?              @map("mnu_dscn_tx")
+  icon            String?              @map("mnu_itm_icn_tx")
+  url             String?              @map("mnu_itm_url_tx")
+  parentId        Int?                 @map("prnt_mnu_itm_id")
+  parent          MenuItem?            @relation("MenuTree", fields: [parentId], references: [id])
+  children        MenuItem[]           @relation("MenuTree")
+  sequence        Int                  @default(0) @map("sqnce_id")
+  header          Int                  @default(0) @map("hdr_in") @db.SmallInt
+  showInMenu      Int                  @default(1) @map("shw_in") @db.SmallInt
+  permissions     RoleMenuPermission[]
+  createdAt       DateTime             @default(now()) @map("i_ts")
+  updatedAt       DateTime?            @map("u_ts")
+  createdBy       String?              @map("crte_usr_id")
+  updatedBy       String?              @map("updte_usr_id")
+  activeIndicator Int                  @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?            @map("d_ts")
+
+  @@map("app_mnu_itm_lst_t")
+}
+
+// Role ↔ menu item with CRUD flags. slct_in also controls sidebar visibility.
+model RoleMenuPermission {
+  id              Int        @id @default(autoincrement()) @map("rle_mnu_itm_rel_ky")
+  roleId          Int        @map("role_id")
+  role            RoleMaster @relation(fields: [roleId], references: [id])
+  menuItemId      Int        @map("mnu_itm_id")
+  menuItem        MenuItem   @relation(fields: [menuItemId], references: [id])
+  canView         Int        @default(0) @map("slct_in") @db.SmallInt
+  canCreate       Int        @default(0) @map("insrt_in") @db.SmallInt
+  canUpdate       Int        @default(0) @map("updt_in") @db.SmallInt
+  canDelete       Int        @default(0) @map("dlte_in") @db.SmallInt
+  canExport       Int        @default(0) @map("exprt_in") @db.SmallInt
+  createdAt       DateTime   @default(now()) @map("i_ts")
+  updatedAt       DateTime?  @map("u_ts")
+  createdBy       String?    @map("crte_usr_id")
+  updatedBy       String?    @map("updte_usr_id")
+  activeIndicator Int        @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?  @map("d_ts")
+
+  @@unique([roleId, menuItemId])
+  @@map("app_rle_mnu_itm_rel_t")
+}
+
+model Session {
+  sid             String    @id
+  data            String
+  userId          String?
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model College {
+  id              Int          @id @default(autoincrement())
+  name            String
+  slug            String       @unique
+  active          Boolean      @default(true)
+  users           User[]
+  courses         Course[]
+  files           FileUpload[]
+  createdAt       DateTime     @default(now()) @map("i_ts")
+  updatedAt       DateTime?    @map("u_ts")
+  createdBy       String?      @map("crte_usr_id")
+  updatedBy       String?      @map("updte_usr_id")
+  activeIndicator Int          @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?    @map("d_ts")
+}
+
+model User {
+  id              String             @id @default(uuid())
+  name            String
+  email           String
+  mobileNo        String?            @map("mobile_no")
+  password        String
+  role            Role
+  roleId          Int                @default(4) @map("role_id")
+  roleDefinition  RoleMaster         @relation(fields: [roleId, role], references: [id, code])
+  status          UserStatus         @default(ACTIVE)
+  collegeId       Int?
+  college         College?           @relation(fields: [collegeId], references: [id])
+  courses         Course[]
+  instructing     CourseInstructor[]
+  passwordResets  PasswordReset[]
+  studentProfile  StudentProfile?
+  teacherProfile  TeacherProfile?
+  headOf          Department[]
+  cohorts         CohortMember[]
+  enrollments     Enrollment[]
+  progress        LessonProgress[]
+  createdAt       DateTime           @default(now()) @map("i_ts")
+  updatedAt       DateTime?          @map("u_ts")
+  createdBy       String?            @map("crte_usr_id")
+  updatedBy       String?            @map("updte_usr_id")
+  activeIndicator Int                @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?          @map("d_ts")
+
+  // PostgreSQL treats NULL collegeIds as distinct, so platform (Super Admin) emails are kept
+  // unique by the partial index "User_platform_email_key" in migration 20261008100000_user_status.
+  // Prisma cannot model partial indexes: remove any DROP INDEX for it from generated migrations.
+  @@unique([collegeId, email])
+  @@unique([collegeId, mobileNo])
+}
+
+model Course {
+  id              String             @id @default(uuid())
+  collegeId       Int
+  college         College            @relation(fields: [collegeId], references: [id])
+  title           String
+  description     String
+  status          CourseStatus       @default(DRAFT)
+  // Syllabus details shown on the course page and in the syllabus PDF.
+  code            String?            @map("course_cd")
+  level           CourseLevel?       @map("level_cd")
+  durationHours   Int?               @map("duration_hrs_ct")
+  objectives      String             @default("") @map("objectives_tx")
+  outcomes        String             @default("") @map("outcomes_tx")
+  // 1 = shared with every college (read-only outside the owning college once published).
+  shared          Int                @default(0) @map("shared_in") @db.SmallInt
+  // Original syllabus / course notes PDF (stored in file_upld_dtl_t like other uploads).
+  syllabusFileId  String?            @map("syllabus_file_id")
+  syllabusFile    FileUpload?        @relation("CourseSyllabus", fields: [syllabusFileId], references: [id])
+  // teacherId is the course owner; co-instructors are in crse_instrctr_rel_t (owner included).
+  teacherId       String
+  teacher         User               @relation(fields: [teacherId], references: [id])
+  instructors     CourseInstructor[]
+  modules         CourseModule[]
+  enrollments     Enrollment[]
+  createdAt       DateTime           @default(now()) @map("i_ts")
+  updatedAt       DateTime?          @map("u_ts")
+  createdBy       String?            @map("crte_usr_id")
+  updatedBy       String?            @map("updte_usr_id")
+  activeIndicator Int                @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?          @map("d_ts")
+
+  @@unique([collegeId, code])
+  @@index([collegeId])
+}
+
+model CourseModule {
+  id              String    @id @default(uuid())
+  collegeId       Int
+  title           String
+  description     String    @default("") @map("module_dscn_tx")
+  position        Int       @default(0)
+  courseId        String
+  course          Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons         Lesson[]
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@index([collegeId])
+}
+
+model Lesson {
+  id                   String           @id @default(uuid())
+  collegeId            Int
+  title                String
+  lessonType           LessonType       @default(TEXT) @map("lesson_type")
+  // Lesson text for TEXT lessons; optional notes for VIDEO and DOCUMENT lessons.
+  content              String           @default("")
+  contentFormat        ContentFormat    @default(TEXT) @map("content_fmt_cd")
+  // Images embedded in Markdown content (file_upld_dtl_t rows with lesson_id = this lesson).
+  assets               FileUpload[]     @relation("LessonAssets")
+  fileId               String?          @map("file_id")
+  file                 FileUpload?      @relation(fields: [fileId], references: [id])
+  durationSec          Int?             @map("duration_sec")
+  allowDownload        Int              @default(0) @map("allow_download_in") @db.SmallInt
+  published            Int              @default(1) @map("published_in") @db.SmallInt
+  // Students must complete the prerequisite lesson before opening or completing this one.
+  prerequisiteLessonId String?          @map("prerequisite_lesson_id")
+  prerequisite         Lesson?          @relation("LessonPrerequisite", fields: [prerequisiteLessonId], references: [id], onDelete: SetNull)
+  dependents           Lesson[]         @relation("LessonPrerequisite")
+  position             Int              @default(0)
+  moduleId             String
+  module               CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress             LessonProgress[]
+  createdAt            DateTime         @default(now()) @map("i_ts")
+  updatedAt            DateTime?        @map("u_ts")
+  createdBy            String?          @map("crte_usr_id")
+  updatedBy            String?          @map("updte_usr_id")
+  activeIndicator      Int              @default(1) @map("a_in") @db.SmallInt
+  deletedAt            DateTime?        @map("d_ts")
+
+  @@index([collegeId])
+}
+
+model Enrollment {
+  id              String    @id @default(uuid())
+  collegeId       Int
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  courseId        String
+  course          Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  // Completed published lessons / published lessons, recalculated when progress or lessons change.
+  progressPct     Int       @default(0) @map("progress_pct")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@unique([userId, courseId])
+  @@index([collegeId])
+}
+
+model LessonProgress {
+  id              String    @id @default(uuid())
+  collegeId       Int
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  lessonId        String
+  lesson          Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  // NULL until the lesson is completed; the row also stores video position and time spent.
+  completedAt     DateTime?
+  lastPositionSec Int       @default(0) @map("last_position_sec")
+  timeSpentSec    Int       @default(0) @map("time_spent_sec")
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@unique([userId, lessonId])
+  @@index([collegeId])
+}
+
+// Course owner and co-instructors. Teachers may edit only courses they instruct.
+model CourseInstructor {
+  id              String         @id @default(uuid()) @map("crse_instrctr_id")
+  collegeId       Int         @map("college_id")
+  courseId        String         @map("course_id")
+  course          Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  userId          String         @map("user_id")
+  user            User           @relation(fields: [userId], references: [id])
+  role            InstructorRole @default(CO_INSTRUCTOR) @map("instrctr_role_cd")
+  createdAt       DateTime       @default(now()) @map("i_ts")
+  updatedAt       DateTime?      @map("u_ts")
+  createdBy       String?        @map("crte_usr_id")
+  updatedBy       String?        @map("updte_usr_id")
+  activeIndicator Int            @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?      @map("d_ts")
+
+  @@unique([courseId, userId])
+  @@index([collegeId])
+  @@map("crse_instrctr_rel_t")
+}
+
+// Uploaded lesson files. storage_key_tx is relative to UPLOAD_DIR: colleges/<collegeId>/<yyyy>/<mm>/<fileId>.<ext>.
+model FileUpload {
+  id              String      @id @default(uuid()) @map("file_id")
+  collegeId       Int      @map("college_id")
+  college         College     @relation(fields: [collegeId], references: [id])
+  storageKey      String      @unique @map("storage_key_tx")
+  originalName    String      @map("orgnl_file_nm")
+  mimeType        String      @map("mime_type_tx")
+  sizeBytes       Int         @map("size_bytes_ct")
+  checksum        String      @map("checksum_tx")
+  purpose         FilePurpose @map("purpose_cd")
+  lessons         Lesson[]
+  syllabusOf      Course[]    @relation("CourseSyllabus")
+  // Set for images that belong to a lesson's formatted content; readable wherever the lesson is.
+  lessonId        String?     @map("lesson_id")
+  lesson          Lesson?     @relation("LessonAssets", fields: [lessonId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now()) @map("i_ts")
+  updatedAt       DateTime?   @map("u_ts")
+  createdBy       String?     @map("crte_usr_id")
+  updatedBy       String?     @map("updte_usr_id")
+  activeIndicator Int         @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?   @map("d_ts")
+
+  @@index([collegeId])
+  @@map("file_upld_dtl_t")
+}
+
+// One-time password reset links. Only the SHA-256 of the token is stored; the token itself is only in the email.
+model PasswordReset {
+  id              String    @id @default(uuid()) @map("rst_tkn_id")
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash       String    @unique @map("tkn_hash_tx")
+  expiresAt       DateTime  @map("expires_ts")
+  usedAt          DateTime? @map("used_ts")
+  requestIp       String?   @map("rqst_ip_tx")
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@index([userId])
+  @@map("pwd_rst_tkn_dtl_t")
+}
+
+// ---- Academic structure (spec section 7: academic years, departments, programs, batches, profiles, cohorts) ----
+// Only one academic year per college is current (is_crnt_in = 1); the API enforces it.
+model AcademicYear {
+  id              String    @id @default(uuid()) @map("acdmc_yr_id")
+  collegeId       Int    @map("college_id")
+  name            String    @map("acdmc_yr_nm")
+  startDate       DateTime  @map("start_dt") @db.Date
+  endDate         DateTime  @map("end_dt") @db.Date
+  isCurrent       Int       @default(0) @map("is_crnt_in") @db.SmallInt
+  batches         Batch[]
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@unique([collegeId, name])
+  @@map("acdmc_yr_lst_t")
+}
+
+model Department {
+  id              String           @id @default(uuid()) @map("dept_id")
+  collegeId       Int           @map("college_id")
+  code            String           @map("dept_cd")
+  name            String           @map("dept_nm")
+  hodUserId       String?          @map("hod_usr_id")
+  hod             User?            @relation(fields: [hodUserId], references: [id])
+  programs        Program[]
+  teachers        TeacherProfile[]
+  createdAt       DateTime         @default(now()) @map("i_ts")
+  updatedAt       DateTime?        @map("u_ts")
+  createdBy       String?          @map("crte_usr_id")
+  updatedBy       String?          @map("updte_usr_id")
+  activeIndicator Int              @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?        @map("d_ts")
+
+  @@unique([collegeId, code])
+  @@map("dept_lst_t")
+}
+
+model Program {
+  id              String     @id @default(uuid()) @map("prgm_id")
+  collegeId       Int     @map("college_id")
+  departmentId    String     @map("dept_id")
+  department      Department @relation(fields: [departmentId], references: [id])
+  code            String     @map("prgm_cd")
+  name            String     @map("prgm_nm")
+  durationYears   Int        @map("duration_yrs_ct")
+  batches         Batch[]
+  createdAt       DateTime   @default(now()) @map("i_ts")
+  updatedAt       DateTime?  @map("u_ts")
+  createdBy       String?    @map("crte_usr_id")
+  updatedBy       String?    @map("updte_usr_id")
+  activeIndicator Int        @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?  @map("d_ts")
+
+  @@unique([collegeId, code])
+  @@map("prgm_lst_t")
+}
+
+// A batch is one intake of a programme in an academic year, optionally split into sections.
+model Batch {
+  id              String           @id @default(uuid()) @map("btch_id")
+  collegeId       Int           @map("college_id")
+  programId       String           @map("prgm_id")
+  program         Program          @relation(fields: [programId], references: [id])
+  academicYearId  String           @map("acdmc_yr_id")
+  academicYear    AcademicYear     @relation(fields: [academicYearId], references: [id])
+  name            String           @map("btch_nm")
+  section         String           @default("") @map("section_tx")
+  students        StudentProfile[]
+  cohorts         Cohort[]
+  createdAt       DateTime         @default(now()) @map("i_ts")
+  updatedAt       DateTime?        @map("u_ts")
+  createdBy       String?          @map("crte_usr_id")
+  updatedBy       String?          @map("updte_usr_id")
+  activeIndicator Int              @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?        @map("d_ts")
+
+  @@unique([collegeId, programId, academicYearId, name, section])
+  @@map("btch_lst_t")
+}
+
+model StudentProfile {
+  id              String    @id @default(uuid()) @map("stdnt_prfl_id")
+  userId          String    @unique @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collegeId       Int    @map("college_id")
+  rollNumber      String    @map("roll_no")
+  batchId         String?   @map("btch_id")
+  batch           Batch?    @relation(fields: [batchId], references: [id])
+  admissionYear   Int?      @map("admsn_yr")
+  dateOfBirth     DateTime? @map("dob_dt") @db.Date
+  gender          String?   @map("gndr_cd")
+  guardianPhone   String?   @map("grdn_phone_no")
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@unique([collegeId, rollNumber])
+  @@index([batchId])
+  @@map("stdnt_prfl_dtl_t")
+}
+
+model TeacherProfile {
+  id              String      @id @default(uuid()) @map("tchr_prfl_id")
+  userId          String      @unique @map("user_id")
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collegeId       Int      @map("college_id")
+  employeeCode    String      @map("emp_cd")
+  departmentId    String?     @map("dept_id")
+  department      Department? @relation(fields: [departmentId], references: [id])
+  designation     String?     @map("dsgntn_tx")
+  qualification   String?     @map("qlfctn_tx")
+  createdAt       DateTime    @default(now()) @map("i_ts")
+  updatedAt       DateTime?   @map("u_ts")
+  createdBy       String?     @map("crte_usr_id")
+  updatedBy       String?     @map("updte_usr_id")
+  activeIndicator Int         @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?   @map("d_ts")
+
+  @@unique([collegeId, employeeCode])
+  @@map("tchr_prfl_dtl_t")
+}
+
+// Groups of students (a class, an elective group) used later for assessment windows and bulk enrolment.
+model Cohort {
+  id              Int                @id @default(autoincrement()) @map("chrt_id")
+  collegeId       Int             @map("college_id")
+  name            String             @map("chrt_nm")
+  description     String             @default("") @map("chrt_dscn_tx")
+  batchId         String?            @map("btch_id")
+  batch           Batch?             @relation(fields: [batchId], references: [id])
+  archived        Int                @default(0) @map("archived_in") @db.SmallInt
+  members         CohortMember[]
+  windows         AssessmentWindow[]
+  createdAt       DateTime           @default(now()) @map("i_ts")
+  updatedAt       DateTime?          @map("u_ts")
+  createdBy       String?            @map("crte_usr_id")
+  updatedBy       String?            @map("updte_usr_id")
+  activeIndicator Int                @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?          @map("d_ts")
+
+  @@unique([collegeId, name])
+  @@map("chrt_lst_t")
+}
+
+model CohortMember {
+  id              String    @id @default(uuid()) @map("chrt_mbr_id")
+  collegeId       Int    @map("college_id")
+  cohortId        Int       @map("chrt_id")
+  cohort          Cohort    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  userId          String    @map("user_id")
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt       DateTime  @default(now()) @map("i_ts")
+  updatedAt       DateTime? @map("u_ts")
+  createdBy       String?   @map("crte_usr_id")
+  updatedBy       String?   @map("updte_usr_id")
+  activeIndicator Int       @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime? @map("d_ts")
+
+  @@unique([cohortId, userId])
+  @@index([userId])
+  @@map("chrt_mbr_rel_t")
+}
+
+// Append-only audit trail of writes (spec section 17.1). before/after never contain passwords or tokens.
+model AuditLog {
+  id                 String   @id @default(uuid()) @map("adt_log_id")
+  collegeId          Int?  @map("college_id")
+  actorId            String?  @map("actor_usr_id")
+  actingAsSuperAdmin Int      @default(0) @map("acting_as_sa_in") @db.SmallInt
+  action             String   @map("action_cd")
+  entityType         String   @map("entity_type_cd")
+  entityId           String?  @map("entity_id")
+  before             Json?    @map("before_json")
+  after              Json?    @map("after_json")
+  ipAddress          String?  @map("ip_addr_tx")
+  userAgent          String?  @map("user_agent_tx")
+  requestId          String?  @map("request_id")
+  occurredAt         DateTime @default(now()) @map("occurred_ts")
+
+  @@index([collegeId, occurredAt])
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("adt_log_dtl_t")
+}
+
+// ---- Assessments (spec section 7: questions, assessments, windows, attempts) ----
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  NUMERIC
+  SHORT_ANSWER
+  CODING
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum AssessmentType {
+  QUIZ
+  ASSIGNMENT
+  EXAM
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum AttemptStrategy {
+  BEST
+  LATEST
+}
+
+enum ResultVisibility {
+  IMMEDIATE
+  AFTER_CLOSE
+  MANUAL
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+}
+
+// Question bank. answerKey holds NUMERIC {value, tolerance} or SHORT_ANSWER {accepted: [..], caseSensitive};
+// choice questions keep their correct options in qstn_optn_lst_t. Keys are never sent to students during an attempt.
+model Question {
+  id              String               @id @default(uuid()) @map("qstn_id")
+  collegeId       Int               @map("college_id")
+  courseId        String?              @map("course_id")
+  questionType    QuestionType         @map("qstn_type_cd")
+  stem            String               @map("stem_tx")
+  explanation     String               @default("") @map("explanation_tx")
+  difficulty      Difficulty           @default(MEDIUM) @map("difficulty_cd")
+  marks           Float                @default(1) @map("marks_ct")
+  negativeMarks   Float                @default(0) @map("negative_marks_ct")
+  answerKey       Json?                @map("answer_key_json")
+  topic           String               @default("") @map("topic_tx")
+  codingProblemId String?              @map("cdng_prblm_id")
+  codingProblem   CodingProblem?       @relation(fields: [codingProblemId], references: [id])
+  options         QuestionOption[]
+  assessments     AssessmentQuestion[]
+  answers         AttemptAnswer[]
+  createdAt       DateTime             @default(now()) @map("i_ts")
+  updatedAt       DateTime?            @map("u_ts")
+  createdBy       String?              @map("crte_usr_id")
+  updatedBy       String?              @map("updte_usr_id")
+  activeIndicator Int                  @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?            @map("d_ts")
+
+  @@index([collegeId])
+  @@index([courseId])
+  @@map("qstn_lst_t")
+}
+
+model QuestionOption {
+  id         String   @id @default(uuid()) @map("qstn_optn_id")
+  questionId String   @map("qstn_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String   @map("optn_tx")
+  isCorrect  Int      @default(0) @map("is_correct_in") @db.SmallInt
+  sequence   Int      @default(0) @map("sqnce_id")
+  createdAt  DateTime @default(now()) @map("i_ts")
+
+  @@index([questionId])
+  @@map("qstn_optn_lst_t")
+}
+
+model Assessment {
+  id               String               @id @default(uuid()) @map("asmt_id")
+  collegeId        Int               @map("college_id")
+  courseId         String?              @map("course_id")
+  assessmentType   AssessmentType       @default(QUIZ) @map("asmt_type_cd")
+  title            String               @map("asmt_ttl")
+  instructions     String               @default("") @map("instructions_tx")
+  durationMin      Int?                 @map("duration_min_ct")
+  passPct          Int                  @default(40) @map("pass_pct")
+  maxAttempts      Int                  @default(1) @map("max_attempts_ct")
+  attemptStrategy  AttemptStrategy      @default(BEST) @map("attempt_strategy_cd")
+  shuffleQuestions Int                  @default(0) @map("shuffle_qstn_in") @db.SmallInt
+  shuffleOptions   Int                  @default(0) @map("shuffle_optn_in") @db.SmallInt
+  resultVisibility ResultVisibility     @default(IMMEDIATE) @map("result_visibility_cd")
+  resultsPublished Int                  @default(0) @map("results_published_in") @db.SmallInt
+  status           AssessmentStatus     @default(DRAFT) @map("status_cd")
+  questions        AssessmentQuestion[]
+  windows          AssessmentWindow[]
+  attempts         Attempt[]
+  createdAt        DateTime             @default(now()) @map("i_ts")
+  updatedAt        DateTime?            @map("u_ts")
+  createdBy        String?              @map("crte_usr_id")
+  updatedBy        String?              @map("updte_usr_id")
+  activeIndicator  Int                  @default(1) @map("a_in") @db.SmallInt
+  deletedAt        DateTime?            @map("d_ts")
+
+  @@index([collegeId])
+  @@map("asmt_lst_t")
+}
+
+model AssessmentQuestion {
+  id            String     @id @default(uuid()) @map("asmt_qstn_id")
+  assessmentId  String     @map("asmt_id")
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  questionId    String     @map("qstn_id")
+  question      Question   @relation(fields: [questionId], references: [id])
+  sequence      Int        @default(0) @map("sqnce_id")
+  marksOverride Float?     @map("marks_override_ct")
+
+  @@unique([assessmentId, questionId])
+  @@map("asmt_qstn_rel_t")
+}
+
+// When students may attempt: cohortId null = every student of the college.
+model AssessmentWindow {
+  id              String     @id @default(uuid()) @map("asmt_wndw_id")
+  assessmentId    String     @map("asmt_id")
+  assessment      Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  cohortId        Int?       @map("chrt_id")
+  cohort          Cohort?    @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  opensAt         DateTime   @map("opens_ts")
+  closesAt        DateTime   @map("closes_ts")
+  extraTimeMin    Int        @default(0) @map("extra_time_min_ct")
+  attempts        Attempt[]
+  createdAt       DateTime   @default(now()) @map("i_ts")
+  updatedAt       DateTime?  @map("u_ts")
+  createdBy       String?    @map("crte_usr_id")
+  updatedBy       String?    @map("updte_usr_id")
+  activeIndicator Int        @default(1) @map("a_in") @db.SmallInt
+  deletedAt       DateTime?  @map("d_ts")
+
+  @@index([assessmentId])
+  @@map("asmt_wndw_lst_t")
+}
+
+// One student attempt. expiresAt is fixed by the server when the attempt starts; layout stores the
+// (possibly shuffled) question and option order shown to this student.
+model Attempt {
+  id           String           @id @default(uuid()) @map("atmpt_id")
+  collegeId    Int           @map("college_id")
+  assessmentId String           @map("asmt_id")
+  assessment   Assessment       @relation(fields: [assessmentId], references: [id])
+  windowId     String           @map("asmt_wndw_id")
+  window       AssessmentWindow @relation(fields: [windowId], references: [id])
+  userId       String           @map("user_id")
+  attemptNo    Int              @map("atmpt_no")
+  status       AttemptStatus    @default(IN_PROGRESS) @map("status_cd")
+  startedAt    DateTime         @default(now()) @map("started_ts")
+  expiresAt    DateTime         @map("expires_ts")
+  submittedAt  DateTime?        @map("submitted_ts")
+  layout       Json             @map("layout_json")
+  score        Float?           @map("score_ct")
+  maxScore     Float            @default(0) @map("max_score_ct")
+  isPassed     Int?             @map("is_passed_in") @db.SmallInt
+  needsGrading Int              @default(0) @map("needs_grading_in") @db.SmallInt
+  answers      AttemptAnswer[]
+  createdAt    DateTime         @default(now()) @map("i_ts")
+  updatedAt    DateTime?        @map("u_ts")
+
+  @@unique([assessmentId, userId, attemptNo])
+  @@index([collegeId])
+  @@index([userId])
+  @@index([status, expiresAt])
+  @@map("atmpt_dtl_t")
+}
+
+model AttemptAnswer {
+  id           String    @id @default(uuid()) @map("atmpt_ans_id")
+  attemptId    String    @map("atmpt_id")
+  attempt      Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId   String    @map("qstn_id")
+  question     Question  @relation(fields: [questionId], references: [id])
+  answer       Json?     @map("answer_json")
+  isCorrect    Int?      @map("is_correct_in") @db.SmallInt
+  marksAwarded Float?    @map("marks_awarded_ct")
+  feedback     String    @default("") @map("feedback_tx")
+  evaluatedBy  String?   @map("evaluated_by")
+  evaluatedAt  DateTime? @map("evaluated_ts")
+  savedAt      DateTime  @default(now()) @map("saved_ts")
+
+  @@unique([attemptId, questionId])
+  @@map("atmpt_ans_dtl_t")
+}
+
+// ---- Coding platform: problems with stdin/stdout test cases, judged by a queue worker ----
+enum SubmissionStatus {
+  ACCEPTED
+  WRONG_ANSWER
+  COMPILE_ERROR
+  RUNTIME_ERROR
+  TIME_LIMIT
+}
+
+// Where a problem may appear (spec 10.2). Assessment-only problems never show in practice.
+enum CodingVisibility {
+  PRACTICE
+  SHARED
+  ASSESSMENT
+}
+
+enum ProblemStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// How a program's output is compared with the expected output (spec 9.2.3).
+enum CheckerMode {
+  TRIMMED
+  EXACT
+  TOKEN
+  CASE_INSENSITIVE
+  NUMERIC
+  UNORDERED
+}
+
+// How passed hidden cases become a score (spec 9.2.2).
+enum ScoringMode {
+  WEIGHTED
+  GROUP
+  BINARY
+}
+
+enum JudgeStatus {
+  QUEUED
+  RUNNING
+  DONE
+  INTERNAL_ERROR
+}
+
+enum SubmissionKind {
+  RUN
+  SUBMIT
+}
+
+// collegeId null = platform library visible to every college. languages null = every enabled language.
+model CodingProblem {
+  id                String             @id @default(uuid()) @map("cdng_prblm_id")
+  collegeId         Int?            @map("college_id")
+  slug              String             @unique @map("prblm_slug_tx")
+  title             String             @map("prblm_ttl")
+  difficulty        Difficulty         @default(EASY) @map("difficulty_cd")
+  topic             String             @default("") @map("topic_tx")
+  statement         String             @map("statement_tx")
+  inputFormat       String             @default("") @map("input_format_tx")
+  outputFormat      String             @default("") @map("output_format_tx")
+  constraints       String             @default("") @map("constraints_tx")
+  timeLimitMs       Int                @default(2000) @map("time_limit_ms_ct")
+  memoryLimitMb     Int                @default(256) @map("memory_limit_mb_ct")
+  sequence          Int                @default(0) @map("sqnce_id")
+  status            ProblemStatus      @default(DRAFT) @map("status_cd")
+  visibility        CodingVisibility   @default(PRACTICE) @map("visibility_cd")
+  languages         Json?              @map("languages_json")
+  checker           CheckerMode        @default(TRIMMED) @map("checker_cd")
+  epsilon           Float              @default(0.000001) @map("epsilon_ct")
+  scoring           ScoringMode        @default(WEIGHTED) @map("scoring_cd")
+  maxScore          Float              @default(100) @map("max_score_ct")
+  referenceLanguage String?            @map("reference_lang_cd")
+  referenceSolution String?            @map("reference_solution_tx")
+  validatedAt       DateTime?          @map("validated_ts")
+  testCases         CodingTestCase[]
+  submissions       CodingSubmission[]
+  questions         Question[]
+  createdAt         DateTime           @default(now()) @map("i_ts")
+  updatedAt         DateTime?          @map("u_ts")
+  createdBy         String?            @map("crte_usr_id")
+  updatedBy         String?            @map("updte_usr_id")
+  activeIndicator   Int                @default(1) @map("a_in") @db.SmallInt
+  deletedAt         DateTime?          @map("d_ts")
+
+  @@index([collegeId])
+  @@map("cdng_prblm_lst_t")
+}
+
+// Samples are shown to students; hidden cases carry the marks and are only reported as passed or failed.
+model CodingTestCase {
+  id             String        @id @default(uuid()) @map("cdng_tst_cs_id")
+  problemId      String        @map("cdng_prblm_id")
+  problem        CodingProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  input          String        @map("input_tx")
+  expectedOutput String        @map("expected_output_tx")
+  isSample       Int           @default(0) @map("is_sample_in") @db.SmallInt
+  weight         Float         @default(1) @map("weight_ct")
+  group          String        @default("") @map("group_tx")
+  explanation    String        @default("") @map("explanation_tx")
+  sequence       Int           @default(0) @map("sqnce_id")
+  createdAt      DateTime      @default(now()) @map("i_ts")
+
+  @@index([problemId])
+  @@map("cdng_tst_cs_lst_t")
+}
+
+// One run or submission. The judge worker takes QUEUED rows (fairly across colleges), runs them and stores the
+// verdict, per-case results, score and the limits it applied. attemptId/questionId link exam submissions.
+model CodingSubmission {
+  id          String            @id @default(uuid()) @map("cdng_sbmsn_id")
+  collegeId   Int            @map("college_id")
+  userId      String            @map("user_id")
+  problemId   String            @map("cdng_prblm_id")
+  problem     CodingProblem     @relation(fields: [problemId], references: [id])
+  kind        SubmissionKind    @default(SUBMIT) @map("kind_cd")
+  jobStatus   JudgeStatus       @default(QUEUED) @map("job_status_cd")
+  language    String            @map("lang_cd")
+  code        String            @map("code_tx")
+  customInput String?           @map("custom_input_tx")
+  status      SubmissionStatus? @map("status_cd")
+  passedCount Int               @default(0) @map("passed_ct")
+  totalCount  Int               @default(0) @map("total_ct")
+  score       Float?            @map("score_ct")
+  maxScore    Float             @default(0) @map("max_score_ct")
+  runtimeMs   Int               @default(0) @map("runtime_ms_ct")
+  results     Json?             @map("results_json")
+  limits      Json?             @map("limits_json")
+  attemptId   String?           @map("atmpt_id")
+  questionId  String?           @map("qstn_id")
+  tries       Int               @default(0) @map("tries_ct")
+  worker      String?           @map("worker_tx")
+  startedAt   DateTime?         @map("started_ts")
+  judgedAt    DateTime?         @map("judged_ts")
+  createdAt   DateTime          @default(now()) @map("i_ts")
+
+  @@index([collegeId])
+  @@index([userId, problemId])
+  @@index([jobStatus, createdAt])
+  @@index([attemptId])
+  @@map("cdng_sbmsn_dtl_t")
+}

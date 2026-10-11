@@ -1,0 +1,203 @@
+[
+  {
+    "title": "1. Introduction to Python",
+    "markdown": "chapter-1.md",
+    "images": [
+      "chapter-1-figure-1.png"
+    ],
+    "characters": 3011
+  },
+  {
+    "title": "2. Installing Python & Writing Your First Program",
+    "markdown": "chapter-2.md",
+    "images": [],
+    "characters": 2557
+  },
+  {
+    "title": "3. Comments, Indentation, Keywords & Identifiers",
+    "markdown": "chapter-3.md",
+    "images": [],
+    "characters": 3094
+  },
+  {
+    "title": "4. Variables and Data Types",
+    "markdown": "chapter-4.md",
+    "images": [],
+    "characters": 3703
+  },
+  {
+    "title": "5. Type Conversion (Casting)",
+    "markdown": "chapter-5.md",
+    "images": [],
+    "characters": 1932
+  },
+  {
+    "title": "6. Input and Output",
+    "markdown": "chapter-6.md",
+    "images": [],
+    "characters": 2911
+  },
+  {
+    "title": "7. Operators",
+    "markdown": "chapter-7.md",
+    "images": [],
+    "characters": 5510
+  },
+  {
+    "title": "8. Conditional Statements \u2014 if / elif / else",
+    "markdown": "chapter-8.md",
+    "images": [
+      "chapter-8-figure-1.png",
+      "chapter-8-figure-2.png",
+      "chapter-8-figure-3.png",
+      "chapter-8-figure-4.png",
+      "chapter-8-figure-5.png"
+    ],
+    "characters": 20921
+  },
+  {
+    "title": "9. for Loop",
+    "markdown": "chapter-9.md",
+    "images": [
+      "chapter-9-figure-1.png"
+    ],
+    "characters": 5703
+  },
+  {
+    "title": "10. while Loop",
+    "markdown": "chapter-10.md",
+    "images": [
+      "chapter-10-figure-1.png",
+      "chapter-10-figure-2.png"
+    ],
+    "characters": 10694
+  },
+  {
+    "title": "11. break, continue, pass & loop-else",
+    "markdown": "chapter-11.md",
+    "images": [],
+    "characters": 5493
+  },
+  {
+    "title": "12. Strings",
+    "markdown": "chapter-12.md",
+    "images": [],
+    "characters": 6579
+  },
+  {
+    "title": "13. Lists",
+    "markdown": "chapter-13.md",
+    "images": [],
+    "characters": 6516
+  },
+  {
+    "title": "14. Tuples",
+    "markdown": "chapter-14.md",
+    "images": [],
+    "characters": 5111
+  },
+  {
+    "title": "15. Sets",
+    "markdown": "chapter-15.md",
+    "images": [],
+    "characters": 5096
+  },
+  {
+    "title": "16. Dictionaries",
+    "markdown": "chapter-16.md",
+    "images": [],
+    "characters": 6235
+  },
+  {
+    "title": "17. Choosing the Right Data Structure",
+    "markdown": "chapter-17.md",
+    "images": [],
+    "characters": 1963
+  },
+  {
+    "title": "18. Comprehensions",
+    "markdown": "chapter-18.md",
+    "images": [],
+    "characters": 4566
+  },
+  {
+    "title": "19. Functions, Closures, Decorators & Generators",
+    "markdown": "chapter-19.md",
+    "images": [
+      "chapter-19-figure-1.png"
+    ],
+    "characters": 25059
+  },
+  {
+    "title": "20. Lambda, map(), filter(), reduce()",
+    "markdown": "chapter-20.md",
+    "images": [],
+    "characters": 3676
+  },
+  {
+    "title": "21. Recursion",
+    "markdown": "chapter-21.md",
+    "images": [],
+    "characters": 3424
+  },
+  {
+    "title": "22. Modules and Packages",
+    "markdown": "chapter-22.md",
+    "images": [],
+    "characters": 4428
+  },
+  {
+    "title": "23. Object-Oriented Programming (OOP)",
+    "markdown": "chapter-23.md",
+    "images": [
+      "chapter-23-figure-1.png",
+      "chapter-23-figure-2.png",
+      "chapter-23-figure-3.png",
+      "chapter-23-figure-4.png",
+      "chapter-23-figure-5.png",
+      "chapter-23-figure-6.png",
+      "chapter-23-figure-7.png",
+      "chapter-23-figure-8.png",
+      "chapter-23-figure-9.png",
+      "chapter-23-figure-10.png",
+      "chapter-23-figure-11.png",
+      "chapter-23-figure-12.png"
+    ],
+    "characters": 36595
+  },
+  {
+    "title": "24. File Handling",
+    "markdown": "chapter-24.md",
+    "images": [
+      "chapter-24-figure-1.png"
+    ],
+    "characters": 4631
+  },
+  {
+    "title": "25. Types of Errors & Exception Handling",
+    "markdown": "chapter-25.md",
+    "images": [
+      "chapter-25-figure-1.png",
+      "chapter-25-figure-2.png"
+    ],
+    "characters": 13367
+  },
+  {
+    "title": "26. Essential Libraries \u2014 NumPy, Pandas & More",
+    "markdown": "chapter-26.md",
+    "images": [],
+    "characters": 17694
+  },
+  {
+    "title": "27. Capstone Project \u2014 Employee Payroll System",
+    "markdown": "chapter-27.md",
+    "images": [],
+    "characters": 10016
+  },
+  {
+    "title": "28. Quick Revision & Interview Questions",
+    "markdown": "chapter-28.md",
+    "images": [],
+    "characters": 5934
+  }
+]

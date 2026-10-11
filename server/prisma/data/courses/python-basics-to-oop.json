@@ -1,0 +1,283 @@
+{
+  "code": "PY101",
+  "title": "Python Programming — Basics to OOP",
+  "level": "BEGINNER",
+  "durationHours": 60,
+  "description": "Complete Python course from the first program to object-oriented programming: syntax, data structures, functions, OOP, files, exceptions, NumPy and Pandas, with real-time examples and flow charts in every chapter.",
+  "objectives": "Write, run and debug Python programs from the command line and an editor\nUse variables, data types, operators, input/output and type conversion correctly\nControl program flow with all four forms of if, for and while loops, break, continue and loop-else\nChoose and use strings, lists, tuples, sets and dictionaries, and write comprehensions\nWrite reusable functions, including closures, decorators, generators, lambdas and recursion\nOrganise code into modules and packages\nDesign programs with classes using encapsulation, inheritance, polymorphism and abstraction\nRead and write files and handle errors with exceptions\nAnalyse data with NumPy, Pandas and Matplotlib",
+  "outcomes": "Build complete console applications such as an ATM, shopping cart or login system\nExplain mutable vs immutable types, scope and the four OOP pillars in interviews\nPick the right data structure for a problem and justify the choice\nModel a real business problem with classes — the Employee Payroll System capstone\nLoad, clean, summarise and chart tabular data with Pandas and Matplotlib",
+  "modules": [
+    {
+      "title": "Unit 1 · Getting Started",
+      "description": "What Python is, how a program runs, setting up Python and the basic rules of the language.",
+      "lessons": [
+        {
+          "title": "1. Introduction to Python",
+          "content": "Course notes: pages 3–4\n\nTopics\n• What is Python and why it is so widely used\n• Interpreted, dynamically typed, platform independent, open source\n• The huge standard library\n• How a Python program actually runs (source → bytecode → interpreter)\n• Where Python is used: web, data, automation, AI",
+          "pages": [
+            3,
+            4
+          ]
+        },
+        {
+          "title": "2. Installing Python & Writing Your First Program",
+          "content": "Course notes: pages 5–6\n\nTopics\n• Installing Python and checking the version\n• Interactive shell vs running a .py file\n• Choosing an editor or IDE — how and when to use each\n• Writing, saving and running your first program",
+          "pages": [
+            5,
+            6
+          ]
+        },
+        {
+          "title": "3. Comments, Indentation, Keywords & Identifiers",
+          "content": "Course notes: pages 7–8\n\nTopics\n• Single-line and multi-line comments, docstrings\n• Indentation — Python's most important rule\n• Reserved keywords\n• Identifiers — naming rules and case sensitivity\n• Naming conventions for readable code",
+          "pages": [
+            7,
+            8
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 2 · Data, Input/Output & Operators",
+      "description": "Variables and built-in types, converting between them, reading input, formatting output and every operator family.",
+      "lessons": [
+        {
+          "title": "4. Variables and Data Types",
+          "content": "Course notes: pages 9–10\n\nTopics\n• Variables and dynamic typing\n• int, float, complex, bool, str, None\n• Mutable vs immutable — the concept interviewers love\n• Why it matters when lists are passed into functions",
+          "pages": [
+            9,
+            10
+          ]
+        },
+        {
+          "title": "5. Type Conversion (Casting)",
+          "content": "Course notes: pages 11–12\n\nTopics\n• Implicit vs explicit conversion\n• int(), float(), str(), bool(), list(), tuple(), set()\n• Common conversion errors and how to avoid them",
+          "pages": [
+            11,
+            12
+          ]
+        },
+        {
+          "title": "6. Input and Output",
+          "content": "Course notes: pages 13–14\n\nTopics\n• Reading user input with input() and converting it\n• print() options: sep and end\n• String formatting — three ways: %, str.format() and f-strings",
+          "pages": [
+            13,
+            14
+          ]
+        },
+        {
+          "title": "7. Operators",
+          "content": "Course notes: pages 15–18\n\nTopics\n• Arithmetic, comparison, logical, assignment operators\n• Identity, membership and bitwise operators\n• Operator precedence\n\nPractice programs\n• Swap two numbers • Even or odd • Last digit of a number\n• Celsius to Fahrenheit • Simple interest\n• Seconds to hours, minutes, seconds • Split a bill among friends",
+          "pages": [
+            15,
+            18
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 3 · Control Flow",
+      "description": "Making decisions and repeating work: all forms of if, for and while loops, and loop control statements.",
+      "lessons": [
+        {
+          "title": "8. Conditional Statements — if / elif / else",
+          "content": "Course notes: pages 19–34\n\nTopics\n• Form 1 — the simple if\n• Form 2 — if ... else\n• Form 3 — if ... elif ... else (the ladder)\n• Form 4 — nested if\n• The one-line if (ternary operator)\n• Truthy and falsy values\n• match ... case (Python 3.10+)\n• Common mistakes and a comparison of all four forms\n\nPractice programs\n• Largest of three numbers • Leap year • Voting eligibility\n• Positive, negative or zero • Discount slab • Traffic signal\n• Simple login check • BMI category",
+          "pages": [
+            19,
+            34
+          ]
+        },
+        {
+          "title": "9. for Loop",
+          "content": "Course notes: pages 35–40\n\nTopics\n• Iterating over sequences and range()\n• enumerate() and zip()\n• Nested loops and patterns\n\nPractice programs\n• Multiplication table • Sum and average of a list • Count vowels\n• Star patterns • Factorial • Largest number without max()\n• Print a list in reverse with positions • Grade every student",
+          "pages": [
+            35,
+            40
+          ]
+        },
+        {
+          "title": "10. while Loop",
+          "content": "Course notes: pages 41–48\n\nTopics\n• Condition-controlled repetition\n• Infinite loops — while True\n• Safety net — always give an infinite loop a limit\n• Counter + maximum + break pattern (login attempts)\n\nPractice programs\n• Print 1 to 10 • Reverse a number • Palindrome number\n• Add until 0 is entered • Number guessing game • Count digits\n• Multiplication quiz • Menu that runs until Exit",
+          "pages": [
+            41,
+            48
+          ]
+        },
+        {
+          "title": "11. break, continue, pass & loop-else",
+          "content": "Course notes: pages 49–52\n\nTopics\n• break — leave the loop early\n• continue — skip to the next iteration\n• pass — a placeholder statement\n• The else clause on for and while loops\n\nPractice programs\n• Prime number check • Search for a name • Skip negative numbers\n• Print only even numbers • Stop reading marks at -1",
+          "pages": [
+            49,
+            52
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 4 · Data Structures",
+      "description": "Strings and Python's four built-in collections, how to choose between them, and comprehensions.",
+      "lessons": [
+        {
+          "title": "12. Strings",
+          "content": "Course notes: pages 53–56\n\nTopics\n• Indexing, slicing and immutability\n• Common string methods\n• Searching, splitting and joining\n\nPractice programs\n• Palindrome word • Vowels, consonants and spaces • Initials from a name\n• Mask a credit card number • Count words and characters\n• Remove duplicate characters • Title-case a book name • Password strength",
+          "pages": [
+            53,
+            56
+          ]
+        },
+        {
+          "title": "13. Lists",
+          "content": "Course notes: pages 57–60\n\nTopics\n• Creating, indexing and slicing lists\n• Adding, removing and sorting items\n• Nested lists\n\nPractice programs\n• Second largest number • Separate even and odd • Merge and sort\n• Marks report • Split into chunks (pagination) • Rotate a list\n• To-do list manager • Class marksheet",
+          "pages": [
+            57,
+            60
+          ]
+        },
+        {
+          "title": "14. Tuples",
+          "content": "Course notes: pages 61–63\n\nTopics\n• Why tuples exist — safety, speed, hashability\n• Packing and unpacking, star (*) unpacking\n\nPractice programs\n• Days of the week • A function returning several values\n• Menu card as a tuple of tuples • Swap and multiple assignment • Counting with tuple keys",
+          "pages": [
+            61,
+            63
+          ]
+        },
+        {
+          "title": "15. Sets",
+          "content": "Course notes: pages 64–66\n\nTopics\n• Unique, unordered collections\n• Set operations — union, intersection, difference, symmetric difference\n\nPractice programs\n• Remove duplicates • Common friends • Skills gap for a job\n• Unique characters • Students who took both subjects",
+          "pages": [
+            64,
+            66
+          ]
+        },
+        {
+          "title": "16. Dictionaries",
+          "content": "Course notes: pages 67–70\n\nTopics\n• Key–value pairs, access, update and delete\n• Looping over keys, values and items\n• Nested dictionaries — real API data\n\nPractice programs\n• Phone book • Student marks with total and average • Letter frequency\n• Merge two dictionaries • Sort by value • Simple inventory system",
+          "pages": [
+            67,
+            70
+          ]
+        },
+        {
+          "title": "17. Choosing the Right Data Structure",
+          "content": "Course notes: page 71\n\nTopics\n• list vs tuple vs set vs dictionary\n• Ordered or not, mutable or not, duplicates or not\n• Typical real-world choices",
+          "pages": [
+            71,
+            71
+          ]
+        },
+        {
+          "title": "18. Comprehensions",
+          "content": "Course notes: pages 72–74\n\nTopics\n• List, set and dictionary comprehensions\n• Conditions inside comprehensions\n• Generator expressions — memory friendly\n• When NOT to use a comprehension\n\nPractice\n• Comprehension one-liners",
+          "pages": [
+            72,
+            74
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 5 · Functions and Modules",
+      "description": "Reusable code: functions and arguments, scope, higher-order functions, closures, decorators, generators, recursion and modules.",
+      "lessons": [
+        {
+          "title": "19. Functions, Closures, Decorators & Generators",
+          "content": "Course notes: pages 75–89\n\nTopics\n• Why functions — reusability, readability, maintainability\n• Defining and calling, parameters vs arguments\n• Positional, keyword, default, *args and **kwargs\n• Scope — local vs global\n• Functions as values and the dispatch table pattern\n• Closures — functions that remember\n• Decorators\n• Generators — how pausing works, memory benefits, infinite sequences\n\nPractice\n• Simple function programs",
+          "pages": [
+            75,
+            89
+          ]
+        },
+        {
+          "title": "20. Lambda, map(), filter(), reduce()",
+          "content": "Course notes: pages 90–91\n\nTopics\n• Lambda — an anonymous one-line function\n• Transforming with map()\n• Selecting with filter()\n• Combining with reduce()",
+          "pages": [
+            90,
+            91
+          ]
+        },
+        {
+          "title": "21. Recursion",
+          "content": "Course notes: pages 92–93\n\nTopics\n• Base case and recursive case\n• How the call stack works\n• Recursion vs iteration (memory and speed)",
+          "pages": [
+            92,
+            93
+          ]
+        },
+        {
+          "title": "22. Modules and Packages",
+          "content": "Course notes: pages 94–96\n\nTopics\n• import styles and the standard library\n• Writing your own module\n• The if __name__ == \"__main__\" guard\n• Packages and __init__.py",
+          "pages": [
+            94,
+            96
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 6 · Object-Oriented Programming",
+      "description": "Classes and objects and the four pillars of OOP, with real-time examples.",
+      "lessons": [
+        {
+          "title": "23. Object-Oriented Programming (OOP)",
+          "content": "Course notes: pages 97–119\n\nTopics\n• Why OOP\n• 23.1 Class and object\n• 23.2 The __init__ constructor\n• 23.3 Instance, class and static methods\n• 23.4 Encapsulation\n• 23.5 Inheritance\n• 23.6 Polymorphism\n• 23.7 Abstraction\n• 23.8 Composition — has-a vs is-a\n• 23.9 OOP summary table\n\nPractice programs\n• Student class • Calculator class • Animal (inheritance + polymorphism)\n• Library book issue/return system • Rectangle with properties",
+          "pages": [
+            97,
+            119
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 7 · Files, Errors and Libraries",
+      "description": "Working with files, handling errors robustly, and the essential data libraries.",
+      "lessons": [
+        {
+          "title": "24. File Handling",
+          "content": "Course notes: pages 120–123\n\nTopics\n• Opening files and file modes\n• Reading and writing text\n• The with statement\n• Working with CSV-style data",
+          "pages": [
+            120,
+            123
+          ]
+        },
+        {
+          "title": "25. Types of Errors & Exception Handling",
+          "content": "Course notes: pages 124–131\n\nTopics\n• Syntax errors — the code is not valid Python\n• Runtime errors (exceptions) — valid code that fails while running\n• Logical errors — the program runs but the answer is wrong\n• try / except / else / finally\n• Raising and defining your own exceptions",
+          "pages": [
+            124,
+            131
+          ]
+        },
+        {
+          "title": "26. Essential Libraries — NumPy, Pandas & More",
+          "content": "Course notes: pages 132–139\n\nTopics\n• 26.1 NumPy — numerical Python\n• 26.2 Pandas — data analysis\n• 26.3 Matplotlib — charts\n• 26.4 Other libraries worth knowing\n• 26.5 list vs ndarray vs DataFrame",
+          "pages": [
+            132,
+            139
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Unit 8 · Capstone and Revision",
+      "description": "Bring everything together in a project, then revise for exams and interviews.",
+      "lessons": [
+        {
+          "title": "27. Capstone Project — Employee Payroll System",
+          "content": "Course notes: pages 140–144\n\nBuild a complete Employee Payroll System using classes, data structures, functions, file handling and exception handling.",
+          "pages": [
+            140,
+            144
+          ]
+        },
+        {
+          "title": "28. Quick Revision & Interview Questions",
+          "content": "Course notes: pages 145–147\n\nA quick revision of every chapter and frequently asked interview questions.",
+          "pages": [
+            145,
+            147
+          ]
+        }
+      ]
+    }
+  ]
+}

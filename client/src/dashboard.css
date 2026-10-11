@@ -1,0 +1,156 @@
+/* Dashboard presentation shared by all four role workspaces. */
+.app-layout { background: #f3f6f3; }
+.app-layout > aside {
+  width: 260px;
+  padding: 30px 20px 20px;
+  background: linear-gradient(165deg, #193f35, #102e27);
+  color: #f1f7f0;
+  border-right: 0;
+  overflow-y: auto;
+}
+.app-layout > aside .brand { margin: 0 12px 32px; font-size: 30px; }
+.app-layout .campus-label {
+  background: #ffffff08;
+  border: 1px solid #ffffff1c;
+  padding: 16px 12px;
+  border-radius: 13px;
+  margin-bottom: 30px;
+  gap: 12px;
+}
+.app-layout .campus-icon { background: #ffffff12; color: #d1e5c5; flex-shrink: 0; }
+.app-layout .campus-label strong { font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.app-layout .campus-label small { display: block; color: #b1c6bb; font-size: 8px; margin-top: 6px; }
+.app-layout .nav-label { color: #9eb8aa; margin-left: 15px; }
+.app-layout nav { gap: 9px; }
+.app-layout nav a {
+  position: relative;
+  color: #c5d5ca;
+  padding: 15px 16px;
+  border-radius: 11px;
+  font-size: 13px;
+  gap: 13px;
+  transition: background 160ms ease, color 160ms ease;
+}
+.app-layout nav a:hover { color: #fff; background: #ffffff0d; }
+.app-layout nav a.active { background: #deebd6; color: #193f35; box-shadow: 0 4px 14px #071a2020; }
+.app-layout nav a.active::after { content: ''; width: 6px; height: 6px; margin-left: auto; border-radius: 50%; background: #507750; }
+.app-layout main { margin-left: 260px; }
+.app-layout header { height: 82px; padding: 0 38px; }
+.app-layout .content { padding: 34px 38px; max-width: 1510px; }
+.app-layout .page-heading { margin-bottom: 26px; }
+.app-layout .stats { gap: 20px; margin: 24px 0 34px; }
+.app-layout .stat { position: relative; min-height: 132px; border: 1px solid #e0e8df; border-radius: 15px; padding: 26px; gap: 19px; box-shadow: 0 5px 18px #203d2e05; transition: box-shadow 160ms ease; }
+.app-layout .stat:hover { box-shadow: 0 8px 25px #203d2e0e; }
+.app-layout .stat-icon { padding: 15px; border-radius: 13px; background: #eaf2e4; color: #4a704c; }
+.app-layout .stat:nth-child(2) .stat-icon { background: #e9eff5; color: #516f92; }
+.app-layout .stat:nth-child(3) .stat-icon { background: #f7f0df; color: #967640; }
+.app-layout .stat small { font-size: 12px; color: #6b7b70; }
+.app-layout .stat strong { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin-top: 8px; }
+.app-layout .course-grid { gap: 24px; }
+.app-layout .course-card { border-radius: 16px; box-shadow: 0 5px 20px #203d2e05; }
+.app-layout .course-cover { height: 175px; padding: 18px 20px; }
+.app-layout .course-body { padding: 24px; }
+.app-layout .course-body h3 { font-size: 19px; line-height: 1.5; }
+.app-layout .course-body > p { min-height: 64px; color: #6e7c71; }
+.app-layout .course-actions { gap: 14px; padding-top: 18px; }
+.app-layout .panel { border-radius: 15px; border-color: #e0e8df; box-shadow: 0 5px 18px #203d2e05; }
+.app-layout .empty { border-radius: 16px; background: #ffffffc9; }
+.app-layout .avatar { background: #e7efdf; color: #345740; font-weight: 700; }
+.app-layout .close { padding: 7px; line-height: 1; }
+@media (max-width: 1100px) {
+  .app-layout .content { padding: 28px 24px; }
+  .app-layout .stat { padding: 20px; gap: 12px; }
+  .app-layout .stat-icon { padding: 11px; }
+}
+@media (max-width: 800px) {
+  .app-layout > aside { width: 80px; padding: 25px 12px 15px; }
+  .app-layout > aside .brand { font-size: 0; margin: 0 10px 30px; }
+  .app-layout main { margin-left: 80px; }
+  .app-layout nav a { font-size: 0; padding: 15px; gap: 0; }
+  .app-layout nav a.active::after { display: none; }
+  .app-layout header { padding: 0 22px; height: 70px; }
+  .app-layout .stat { min-height: 112px; padding: 16px; }
+  .app-layout .stat small { font-size: 10px; }
+  .app-layout .stat strong { font-size: 27px; }
+}
+@media (max-width: 560px) {
+  .app-layout .content { padding: 24px 16px; }
+  .app-layout .stats { gap: 12px; }
+  .app-layout .stat { min-height: 96px; padding: 20px; }
+  .app-layout .course-body { padding: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-layout nav a, .app-layout .stat { transition: none; }
+}
+/* Top bar: a slim continuation of the sidebar, holding the page action, college switcher and profile. */
+.app-layout header { height: 64px; padding: 0 32px; background: linear-gradient(90deg, #183d33, #1d4639); border-bottom: 0; color: #f1f7f0; box-shadow: 0 2px 10px #0d241d1f; }
+.app-layout .header-action { border: 0; border-radius: 999px; padding: 9px 16px; background: #deebd6; color: #193f35; font-size: 12.5px; font-weight: 700; margin-right: auto; }
+.app-layout .header-action:hover { background: #ecf4e6; }
+.app-layout .college-switcher { color: #a9c0b3; font-weight: 600; }
+.app-layout .college-switcher select { min-width: 230px; padding: 8px 12px; border-radius: 999px; background-color: #ffffff14; color: #f1f7f0; border: 1px solid #ffffff24; font-size: 12.5px; }
+.app-layout .college-switcher select:focus { border-color: #deebd6; outline: none; }
+.app-layout .college-switcher select option { color: #263b34; background: #fff; }
+.app-layout button.profile { color: #f1f7f0; padding: 4px 8px; }
+.app-layout button.profile small { color: #a9c0b3; }
+.app-layout button.profile:hover, .app-layout button.profile[aria-expanded=true] { background: #ffffff14; }
+.app-layout header .avatar { width: 34px; height: 34px; background: #deebd6; color: #193f35; }
+.app-layout .profile-dropdown { color: #263b34; }
+.app-layout .content { padding-top: 28px; }
+@media (max-width: 800px) { .app-layout header { height: 60px; padding: 0 14px; } .app-layout .header-action { padding: 8px 12px; } .app-layout .college-switcher > :first-child { display: none; } }
+
+/* Sidebar show/hide: the three-line button in the header. Wide screens slide the sidebar away; phones open it over the page. */
+.app-layout > aside { transition: transform 220ms ease; z-index: 25; }
+.app-layout main { transition: margin-left 220ms ease; }
+.app-layout .sidebar-toggle { border: 0; background: #ffffff14; color: #f1f7f0; width: 40px; height: 40px; padding: 0; border-radius: 10px; margin-right: auto; flex-shrink: 0; }
+.app-layout .sidebar-toggle:hover { background: #ffffff26; }
+.app-layout .sidebar-toggle + .header-action { margin-right: auto; margin-left: 12px; }
+.app-layout:has(.sidebar-toggle + .header-action) .sidebar-toggle { margin-right: 0; }
+@media (min-width: 801px) {
+}
+@media (max-width: 800px) {
+  .app-layout > aside { width: 270px; padding: 30px 20px 20px; transform: translateX(-100%); box-shadow: 8px 0 30px #0d241d40; }
+  .app-layout.sidebar-phone-open > aside { transform: none; }
+  .app-layout main { margin-left: 0; }
+  .app-layout > aside .brand { font-size: 30px; margin: 0 12px 32px; }
+  .app-layout > aside .brand-dot, .app-layout > aside .campus-label, .app-layout > aside .nav-label { display: flex; }
+  .app-layout > aside .nav-label { display: block; }
+  .app-layout nav a { font-size: 13px; padding: 15px 16px; gap: 13px; }
+  .app-layout nav a.active::after { display: block; }
+  .sidebar-scrim { position: fixed; inset: 0; background: #0d241d66; z-index: 24; }
+}
+@media (prefers-reduced-motion: reduce) { .app-layout > aside, .app-layout main { transition: none; } }
+
+/* Closed sidebar on wide screens: the same green sidebar, icons only (names show as tooltips). */
+.app-layout > aside { transition: transform 220ms ease, width 220ms ease, padding 220ms ease; }
+@media (min-width: 801px) {
+  .app-layout.sidebar-closed > aside { width: 84px; padding: 24px 14px 16px; overflow-x: hidden; }
+  .app-layout.sidebar-closed main { margin-left: 84px; }
+  .app-layout.sidebar-closed > aside .nav-text { display: none; }
+  .app-layout.sidebar-closed > aside .brand { justify-content: center; margin: 0 0 26px; }
+  .app-layout.sidebar-closed > aside .campus-label { justify-content: center; padding: 10px 0; margin-bottom: 22px; }
+  .app-layout.sidebar-closed > aside .nav-label { display: block; height: 1px; margin: 0 8px 14px; overflow: hidden; color: transparent; background: #ffffff1f; }
+  .app-layout.sidebar-closed > aside .nav-section:first-of-type .nav-label { display: none; }
+  .app-layout.sidebar-closed nav a { justify-content: center; padding: 14px 0; gap: 0; }
+  .app-layout.sidebar-closed nav a.active::after { display: none; }
+}
+/* Menu toggle: a plain icon right next to the sidebar. */
+.app-layout header { padding-left: 10px; }
+.app-layout .sidebar-toggle { background: none; width: 36px; height: 36px; border-radius: 8px; color: #f1f7f0; }
+.app-layout .sidebar-toggle:hover { background: #ffffff14; }
+
+/* Menu toggle as a white tile flush against the sidebar, with a dark icon. */
+.app-layout header { padding-left: 0; }
+.app-layout .sidebar-toggle { align-self: stretch; height: auto; width: 64px; border-radius: 0; background: #fff; color: #1f2d3a; border-right: 1px solid #e3e9e1; }
+.app-layout .sidebar-toggle:hover { background: #f1f5ef; }
+@media (max-width: 800px) { .app-layout .sidebar-toggle { width: 56px; } }
+
+/* Plain white top bar (no green); text and controls switch to dark colours. */
+.app-layout header { background: #fff; color: #263b34; box-shadow: none; border-bottom: 1px solid #e3e9e1; }
+.app-layout button.profile { color: #263b34; }
+.app-layout button.profile small { color: #7a867d; }
+.app-layout button.profile:hover, .app-layout button.profile[aria-expanded=true] { background: #f1f5ef; }
+.app-layout header .avatar { background: #e7efdf; color: #345740; }
+.app-layout .college-switcher { color: #6d7c71; }
+.app-layout .college-switcher select { background-color: #fff; color: #263b34; border: 1px solid #dce3d6; }
+.app-layout .header-action { background: #254f42; color: #fff; }
+.app-layout .header-action:hover { background: #173e32; }
