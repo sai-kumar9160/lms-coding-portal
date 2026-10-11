@@ -22,3 +22,9 @@ server.on('error', error => {
     log.error(error.code === 'EADDRINUSE' ? `Port ${port} is already in use. Stop the existing backend before starting another.` : error.message);
     process.exitCode = 1;
 });
+process.on('unhandledRejection', (reason) => {
+    log.error('Unhandled Promise Rejection', { error: reason instanceof Error ? reason.message : String(reason), stack: reason instanceof Error ? reason.stack : undefined });
+});
+process.on('uncaughtException', (err) => {
+    log.error('Uncaught Exception', { error: err.message, stack: err.stack });
+});

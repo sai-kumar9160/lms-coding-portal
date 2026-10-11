@@ -42,13 +42,58 @@ function fileStream({ directory, retentionDays }) {
     return stream;
 }
 
+const useColor = process.env.NO_COLOR === undefined && process.env.NODE_ENV !== 'test';
+
+const ANSI = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    red: '\x1b[31m',
+    brightRed: '\x1b[91m',
+    green: '\x1b[32m',
+    brightGreen: '\x1b[92m',
+    yellow: '\x1b[33m',
+    brightYellow: '\x1b[93m',
+    cyan: '\x1b[36m',
+    gray: '\x1b[90m',
+};
+
+function formatConsole(level, context, ts, message, meta) {
+    if (!useColor) {
+        const details = meta && Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+        return `[${level.toUpperCase()}|${context}|${ts}] ${message}${details}`;
+    }
+
+    const badge = level === 'error'
+        ? `${ANSI.brightRed}${ANSI.bold}[ERROR]${ANSI.reset}`
+        : level === 'warn'
+        ? `${ANSI.brightYellow}${ANSI.bold}[WARN ]${ANSI.reset}`
+        : level === 'info'
+        ? `${ANSI.brightGreen}${ANSI.bold}[INFO ]${ANSI.reset}`
+        : `${ANSI.gray}${ANSI.bold}[DEBUG]${ANSI.reset}`;
+
+    const ctx = `${ANSI.cyan}[${context}]${ANSI.reset}`;
+    const time = `${ANSI.gray}${ts}${ANSI.reset}`;
+    const msgColor = level === 'error' ? ANSI.brightRed : level === 'warn' ? ANSI.brightYellow : level === 'debug' ? ANSI.gray : ANSI.reset;
+    let line = `${badge} ${ctx} ${time} ${msgColor}${message}${ANSI.reset}`;
+
+    if (meta && typeof meta === 'object') {
+        const { stack, ...rest } = meta;
+        if (Object.keys(rest).length > 0) {
+            line += ` ${ANSI.gray}${JSON.stringify(rest)}${ANSI.reset}`;
+        }
+        if (stack) {
+            line += `\n${ANSI.red}${stack}${ANSI.reset}`;
+        }
+    }
+    return line;
+}
+
 function write(level, context, message, meta) {
     const config = settings();
     if (levels[level] > config.threshold)
         return;
     const ts = new Date().toISOString();
-    const details = meta && Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-    console[consoleMethod[level]](`[${level.toUpperCase()}|${context}|${ts}] ${message}${details}`);
+    console[consoleMethod[level]](formatConsole(level, context, ts, message, meta));
     if (config.toFile)
         fileStream(config).write(`${JSON.stringify({ ts, level, context, message, ...meta })}\n`);
 }

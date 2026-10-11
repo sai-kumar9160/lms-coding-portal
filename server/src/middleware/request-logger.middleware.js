@@ -16,7 +16,7 @@ export function requestLogger(req, res, next) {
         const ms = Number(process.hrtime.bigint() - started) / 1e6;
         // req.path is relative to the router mount point here; originalUrl keeps the /api prefix.
         const path = req.originalUrl.split('?')[0];
-        const level = res.statusCode >= 500 ? 'error' : path === '/api/health' ? 'debug' : 'info';
+        const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : path === '/api/health' ? 'debug' : 'info';
         log[level](`${req.method} ${path} ${res.statusCode} ${ms.toFixed(1)}ms`, { requestId: req.id, userId: req.identity?.id, collegeId: req.collegeId, ...(req.actingAsSuperAdmin ? { actingAsSuperAdmin: true } : {}), ip: req.ip });
     });
     next();
