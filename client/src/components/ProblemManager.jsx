@@ -3,6 +3,8 @@ import { ArrowLeft, CheckCircle2, Pencil, Plus, Search, Trash2, Upload } from 'l
 import { useWorkspace } from '../workspace';
 import { CodeEditor } from './CodeEditor';
 import { verdictLabel } from './JudgeResult';
+import { STARTERS } from './codeStarters';
+import { getProblemSolutions } from './referenceSolutions';
 
 const CHECKERS = { TRIMMED: 'Trimmed (ignore trailing spaces)', EXACT: 'Exact', TOKEN: 'Tokens (any spacing)', CASE_INSENSITIVE: 'Case-insensitive', NUMERIC: 'Numbers within epsilon', UNORDERED: 'Lines in any order' };
 const SCORING = { WEIGHTED: 'Weighted (partial marks per case)', GROUP: 'Groups (all cases in a group)', BINARY: 'All or nothing' };
@@ -14,11 +16,39 @@ const when = value => value ? new Date(value).toLocaleString() : '-';
 function DetailsForm({ problem, languages, onSaved }) {
     const { api } = useWorkspace();
     const [form, setForm] = useState(() => problem ? Object.fromEntries(Object.keys(blank).map(k => [k, problem[k] ?? blank[k]])) : blank);
+    const [solutions, setSolutions] = useState(() => {
+        const initialLang = problem?.referenceLanguage || 'python';
+        const initialCode = problem?.referenceSolution || '';
+        const known = getProblemSolutions(problem?.slug);
+        return {
+            ...known,
+            ...(initialCode ? { [initialLang]: initialCode } : {}),
+        };
+    });
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [previewInput, setPreviewInput] = useState('');
     const [preview, setPreview] = useState(null);
     const [running, setRunning] = useState(false);
+
+    function switchReferenceLanguage(nextLang) {
+        const currentLang = form.referenceLanguage || 'python';
+        const currentCode = form.referenceSolution || '';
+        const updated = { ...solutions, [currentLang]: currentCode };
+        setSolutions(updated);
+        const nextCode = updated[nextLang] ?? getProblemSolutions(problem?.slug)[nextLang] ?? STARTERS[nextLang] ?? '';
+        setForm(current => ({
+            ...current,
+            referenceLanguage: nextLang,
+            referenceSolution: nextCode,
+        }));
+        setPreview(null);
+    }
+
+    function onCodeChange(value) {
+        setForm(current => ({ ...current, referenceSolution: value }));
+        setSolutions(prev => ({ ...prev, [form.referenceLanguage || 'python']: value }));
+    }
     async function runPreview() {
         setRunning(true); setPreview(null); setError('');
         try {
@@ -60,16 +90,12 @@ function DetailsForm({ problem, languages, onSaved }) {
             <label>Scoring<select {...field('scoring')}>{Object.entries(SCORING).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
             <label>Maximum score<input type="number" min="1" max="1000" {...field('maxScore')}/></label>
         </div>
-        <fieldset className="language-picks">
-            <legend>Allowed languages <small className="muted">(none ticked = all)</small></legend>
-            {languages.map(l => <label key={l.id} className="check"><input type="checkbox" checked={allowed.includes(l.id)} onChange={event => setForm({ ...form, languages: event.target.checked ? [...allowed, l.id] : allowed.filter(id => id !== l.id) })}/>{l.label}</label>)}
-        </fieldset>
         <div className="reference-head">
             <strong>Reference solution</strong>
-            <select aria-label="Reference language" value={form.referenceLanguage ?? 'python'} onChange={event => setForm({ ...form, referenceLanguage: event.target.value })}>{languages.filter(l => l.available).map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
+            <select aria-label="Reference language" value={form.referenceLanguage ?? 'python'} onChange={event => switchReferenceLanguage(event.target.value)}>{languages.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}</select>
             <small className="muted">Must pass every test case before the problem can be published. Never shown to students.</small>
         </div>
-        <div className="reference-editor"><CodeEditor value={form.referenceSolution ?? ''} onChange={value => setForm({ ...form, referenceSolution: value })} language={form.referenceLanguage}/></div>
+        <div className="reference-editor"><CodeEditor value={form.referenceSolution ?? ''} onChange={onCodeChange} language={form.referenceLanguage}/></div>
         <section className="reference-preview">
             <label>Custom input<textarea rows={3} value={previewInput} onChange={event => setPreviewInput(event.target.value)} placeholder="Enter input for your reference solution"/></label>
             <button type="button" className="secondary" disabled={running || saving || !form.referenceSolution?.trim() || !languages.some(language => language.id === form.referenceLanguage && language.available)} onClick={runPreview}>{running ? 'Running...' : 'Run code'}</button>
