@@ -5,40 +5,64 @@
 BEGIN;
 
 CREATE TABLE public.stdnt_prfl_dtl_t (
-    stdnt_prfl_id text NOT NULL,
-    user_id text NOT NULL,
-    college_id text NOT NULL,
+    stdnt_prfl_id integer NOT NULL,
+    user_id integer NOT NULL,
+    college_id integer NOT NULL,
     roll_no text NOT NULL,
-    btch_id text,
+    btch_id integer,
     admsn_yr integer,
     dob_dt date,
     gndr_cd text,
     grdn_phone_no text,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT stdnt_prfl_dtl_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
 
+CREATE SEQUENCE public.stdnt_prfl_dtl_t_stdnt_prfl_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.stdnt_prfl_dtl_t_stdnt_prfl_id_seq OWNED BY public.stdnt_prfl_dtl_t.stdnt_prfl_id;
+
 CREATE TABLE public.tchr_prfl_dtl_t (
-    tchr_prfl_id text NOT NULL,
-    user_id text NOT NULL,
-    college_id text NOT NULL,
+    tchr_prfl_id integer NOT NULL,
+    user_id integer NOT NULL,
+    college_id integer NOT NULL,
     emp_cd text NOT NULL,
-    dept_id text,
+    dept_id integer,
     dsgntn_tx text,
     qlfctn_tx text,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT tchr_prfl_dtl_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.tchr_prfl_dtl_t_tchr_prfl_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.tchr_prfl_dtl_t_tchr_prfl_id_seq OWNED BY public.tchr_prfl_dtl_t.tchr_prfl_id;
+
+ALTER TABLE ONLY public.stdnt_prfl_dtl_t ALTER COLUMN stdnt_prfl_id SET DEFAULT nextval('public.stdnt_prfl_dtl_t_stdnt_prfl_id_seq'::regclass);
+
+ALTER TABLE ONLY public.tchr_prfl_dtl_t ALTER COLUMN tchr_prfl_id SET DEFAULT nextval('public.tchr_prfl_dtl_t_tchr_prfl_id_seq'::regclass);
 
 ALTER TABLE ONLY public.stdnt_prfl_dtl_t
     ADD CONSTRAINT stdnt_prfl_dtl_t_pkey PRIMARY KEY (stdnt_prfl_id);

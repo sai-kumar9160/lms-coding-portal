@@ -6,12 +6,19 @@ import os from 'node:os';
 import path from 'node:path';
 import jwt from 'jsonwebtoken';
 import PDFDocument from 'pdfkit';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { findAll } from './test-helpers.js';
+// Units of a course (retired ones included), each with its lessons in order.
+async function modulesWithLessons(courseId) {
+    const modules = await findAll('courseModule', { courseId }, 'ORDER BY t.position');
+    for (const m of modules) m.lessons = await findAll('lesson', { moduleId: m.id }, 'ORDER BY t.position');
+    return modules;
+}
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
 const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lms-pdfimport-'));
 process.env.UPLOAD_DIR = uploadDir;
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 
 // A small two-chapter PDF: cover, chapter headings (20pt), sub-headings (14pt), body text and Courier code.
 function samplePdf() {
@@ -77,7 +84,8 @@ test('create a course from an uploaded PDF', async () => {
         const created = await fromPdf(teacher, pdf, { title: 'Java Basics', code: 'jv101', level: 'BEGINNER' });
         assert.equal(created.status, 201, JSON.stringify(created.data));
         assert.ok(created.data.lessons >= 2);
-        const course = await db.course.findUniqueOrThrow({ where: { id: created.data.id }, include: { modules: { include: { lessons: { orderBy: { position: 'asc' } } } } } });
+        const course = await findOne('course', { id: created.data.id });
+        course.modules = await modulesWithLessons(course.id);
         assert.equal(course.status, 'DRAFT', 'Imported courses start as drafts');
         assert.equal(course.code, 'JV101');
         assert.ok(course.syllabusFileId, 'The whole PDF is linked to the course');
@@ -102,26 +110,25 @@ test('create a course from an uploaded PDF', async () => {
         const rebuilt = await request(`/courses/${course.id}/rebuild-from-pdf`, teacher, 'POST');
         assert.equal(rebuilt.status, 200, JSON.stringify(rebuilt.data));
         assert.equal(rebuilt.data.lessons, created.data.lessons);
-        const modules = await db.courseModule.findMany({ where: { courseId: course.id }, include: { lessons: true } });
+        const modules = await modulesWithLessons(course.id);
         assert.ok(modules.some(m => m.activeIndicator === 0) && modules.some(m => m.activeIndicator === 1), 'Old units are retired, new ones active');
         const activeTitles = modules.filter(m => m.activeIndicator === 1).flatMap(m => m.lessons.map(l => l.title));
         assert.ok(activeTitles.includes('1. Hello Java'));
-        const logEntry = await db.auditLog.findFirst({ where: { collegeId, action: 'create_from_pdf' } });
-        assert.equal(logEntry.entityId, course.id);
+        const logEntry = await findFirst('auditLog', { collegeId, action: 'create_from_pdf' });
+        assert.equal(logEntry.entityId, String(course.id));
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
+        await remove('session', { sid: sids });
         if (collegeId) {
-            await db.course.deleteMany({ where: { collegeId } });
-            await db.fileUpload.deleteMany({ where: { collegeId } });
-            await db.auditLog.deleteMany({ where: { collegeId } });
-            await db.user.deleteMany({ where: { collegeId } });
-            await db.college.deleteMany({ where: { id: collegeId } });
+            await remove('course', { collegeId });
+            await remove('fileUpload', { collegeId });
+            await remove('auditLog', { collegeId });
+            await remove('user', { collegeId });
+            await remove('college', { id: collegeId });
         }
         fs.rmSync(uploadDir, { recursive: true, force: true });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

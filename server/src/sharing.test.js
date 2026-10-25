@@ -5,12 +5,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove, fakeId } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
 const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lms-share-'));
 process.env.UPLOAD_DIR = uploadDir;
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 
 test('courses shared with all colleges and read-only access for teachers', async () => {
@@ -52,7 +52,7 @@ test('courses shared with all colleges and read-only access for teachers', async
 
         // College A: a course with a visible lesson, a hidden lesson, a PDF lesson and a syllabus PDF.
         const course = (await request('/courses', teacherA, 'POST', { title: 'Shared Python', description: 'Visible to every college', moduleTitle: 'Unit 1', lessonTitle: 'Hello', content: 'Print hello world.', code: 'SPY1' })).data;
-        const moduleId = (await db.courseModule.findFirstOrThrow({ where: { courseId: course.id } })).id;
+        const moduleId = (await findOne('courseModule', { courseId: course.id })).id;
         const lessonsPath = `/courses/${course.id}/modules/${moduleId}/lessons`;
         const notes = await upload(teacherA, pdf, 'notes.pdf');
         const pdfLesson = (await request(lessonsPath, teacherA, 'POST', { title: 'Reading', lessonType: 'DOCUMENT', fileId: notes.id, allowDownload: false })).data;
@@ -92,15 +92,15 @@ test('courses shared with all colleges and read-only access for teachers', async
         assert.equal(Buffer.from(await generated.arrayBuffer()).subarray(0, 5).toString(), '%PDF-');
 
         // Formatted chapter content: kept out of lists, served per lesson, with its images readable wherever the lesson is.
-        const { fileModel } = await import('./models/file.model.js');
+        const { fileMdl } = await import('./modules/file/models/fileMdl.js');
         const { tmpDir } = await import('./services/file-storage.service.js');
         const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
         const pngPath = path.join(tmpDir, `test-${Date.now()}.png`);
         fs.writeFileSync(pngPath, png);
         const firstLesson = seenByB.modules[0].lessons[0];
-        const image = await fileModel.store({ id: 'test' }, created[0], 'IMAGE', { path: pngPath, originalname: 'figure.png', size: png.length }, { lessonId: firstLesson.id });
+        const image = await fileMdl.store({ id: fakeId() }, created[0], 'IMAGE', { path: pngPath, originalname: 'figure.png', size: png.length }, { lessonId: firstLesson.id });
         const markdown = `## Heading\n\n![Figure](file:${image.id})\n\n\`\`\`python\nprint("hi")\n\`\`\``;
-        await db.lesson.update({ where: { id: firstLesson.id }, data: { content: markdown, contentFormat: 'MARKDOWN' } });
+        await change('lesson', { id: firstLesson.id }, { content: markdown, contentFormat: 'MARKDOWN' });
         const listed = (await request('/courses', studentB)).data.find(c => c.id === course.id).modules[0].lessons[0];
         assert.equal(listed.content, '', 'Lists leave formatted chapters out');
         assert.equal(listed.hasArticle, true);
@@ -110,14 +110,14 @@ test('courses shared with all colleges and read-only access for teachers', async
         assert.equal(article.data.content, markdown);
         assert.equal((await media(studentB, image.id)).status, 200, 'Lesson images open across colleges for shared courses');
         assert.equal((await media(studentB, image.id, '?download=1')).status, 200);
-        const hiddenLesson = await db.lesson.findFirstOrThrow({ where: { title: 'Hidden draft', module: { courseId: course.id } } });
+        const hiddenLesson = await db.one(`SELECT l.id FROM "Lesson" l JOIN "CourseModule" m ON m.id = l."moduleId" WHERE l.title = 'Hidden draft' AND m."courseId" = $1`, [course.id]);
         assert.equal((await request(`/lessons/${hiddenLesson.id}/content`, studentB)).status, 404, 'Hidden lessons stay hidden');
         assert.equal((await request(`/lessons/${hiddenLesson.id}/content`, teacherA)).status, 200, 'Editors can read hidden lessons');
 
         // Progress of a college B student is recorded under college B.
         assert.equal((await request(`/lessons/${seenByB.modules[0].lessons[0].id}/complete`, studentB, 'POST')).status, 200);
         assert.equal((await request(`/lessons/${pdfLesson.id}/complete`, studentB, 'POST')).status, 200);
-        const enrollment = await db.enrollment.findFirstOrThrow({ where: { courseId: course.id, user: { email: 'student@share.local', collegeId: created[1] } } });
+        const enrollment = await db.one(`SELECT e."collegeId", e.progress_pct AS "progressPct" FROM "Enrollment" e JOIN "User" u ON u.id = e."userId" WHERE e."courseId" = $1 AND u.email = 'student@share.local' AND u."collegeId" = $2`, [course.id, created[1]]);
         assert.equal(enrollment.collegeId, created[1]);
         assert.equal(enrollment.progressPct, 100, 'Hidden lessons do not count');
 
@@ -130,17 +130,16 @@ test('courses shared with all colleges and read-only access for teachers', async
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
-        await db.lessonProgress.deleteMany({ where: { collegeId: { in: created } } });
-        await db.enrollment.deleteMany({ where: { collegeId: { in: created } } });
-        await db.course.deleteMany({ where: { collegeId: { in: created } } });
-        await db.fileUpload.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
+        await remove('session', { sid: sids });
+        await remove('lessonProgress', { collegeId: created });
+        await remove('enrollment', { collegeId: created });
+        await remove('course', { collegeId: created });
+        await remove('fileUpload', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('college', { id: created });
         fs.rmSync(uploadDir, { recursive: true, force: true });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

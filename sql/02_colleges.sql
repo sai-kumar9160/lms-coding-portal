@@ -5,18 +5,30 @@
 BEGIN;
 
 CREATE TABLE public."College" (
-    id text NOT NULL,
+    id integer NOT NULL,
     name text NOT NULL,
     slug text NOT NULL,
     active boolean DEFAULT true NOT NULL,
-    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP CONSTRAINT "College_createdAt_not_null" NOT NULL,
+    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT "College_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public."College_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."College_id_seq" OWNED BY public."College".id;
+
+ALTER TABLE ONLY public."College" ALTER COLUMN id SET DEFAULT nextval('public."College_id_seq"'::regclass);
 
 ALTER TABLE ONLY public."College"
     ADD CONSTRAINT "College_pkey" PRIMARY KEY (id);

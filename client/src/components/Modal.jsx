@@ -8,9 +8,9 @@ import { ProfileForm } from './ProfileForm';
 // modal values: 'college' | 'user' | 'course' (create forms), 'manage:<courseId>', 'profile:<userId>', or '<courseId>' (viewer).
 export function Modal() {
     const { modal, setModal, courses, users, error, reload } = useWorkspace();
-    const managed = modal.startsWith('manage:') && courses.find(c => c.id === modal.slice(7));
-    const viewed = courses.find(c => c.id === modal);
-    const person = modal.startsWith('profile:') && users.find(u => u.id === modal.slice(8));
+    const managed = modal.startsWith('manage:') && courses.find(c => String(c.id) === modal.slice(7));
+    const viewed = courses.find(c => String(c.id) === modal);
+    const person = modal.startsWith('profile:') && users.find(u => String(u.id) === modal.slice(8));
     return <div className="modal-backdrop"><section className={`modal${managed || viewed ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label="Workspace form">
         <button aria-label="Close dialog" className="close" onClick={() => setModal('')}><X size={22}/></button>
         {error && <div className="alert" role="alert">{error}</div>}

@@ -5,15 +5,15 @@
 BEGIN;
 
 CREATE TABLE public."Course" (
-    id text NOT NULL,
-    "collegeId" text NOT NULL,
+    id integer NOT NULL,
+    "collegeId" integer NOT NULL,
     title text NOT NULL,
     description text NOT NULL,
-    "teacherId" text NOT NULL,
-    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP CONSTRAINT "Course_createdAt_not_null" NOT NULL,
+    "teacherId" integer NOT NULL,
+    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     status public."CourseStatus" DEFAULT 'DRAFT'::public."CourseStatus" NOT NULL,
@@ -22,27 +22,51 @@ CREATE TABLE public."Course" (
     level_cd public."CourseLevel",
     objectives_tx text DEFAULT ''::text NOT NULL,
     outcomes_tx text DEFAULT ''::text NOT NULL,
-    syllabus_file_id text,
+    syllabus_file_id integer,
     shared_in smallint DEFAULT 0 NOT NULL,
     CONSTRAINT "Course_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT "Course_duration_check" CHECK (((duration_hrs_ct IS NULL) OR ((duration_hrs_ct >= 1) AND (duration_hrs_ct <= 2000)))),
     CONSTRAINT "Course_shared_in_check" CHECK ((shared_in = ANY (ARRAY[0, 1])))
 );
 
+CREATE SEQUENCE public."Course_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."Course_id_seq" OWNED BY public."Course".id;
+
 CREATE TABLE public.crse_instrctr_rel_t (
-    crse_instrctr_id text NOT NULL,
-    college_id text NOT NULL,
-    course_id text NOT NULL,
-    user_id text NOT NULL,
+    crse_instrctr_id integer NOT NULL,
+    college_id integer NOT NULL,
+    course_id integer NOT NULL,
+    user_id integer NOT NULL,
     instrctr_role_cd public."InstructorRole" DEFAULT 'CO_INSTRUCTOR'::public."InstructorRole" NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT crse_instrctr_rel_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.crse_instrctr_rel_t_crse_instrctr_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.crse_instrctr_rel_t_crse_instrctr_id_seq OWNED BY public.crse_instrctr_rel_t.crse_instrctr_id;
+
+ALTER TABLE ONLY public."Course" ALTER COLUMN id SET DEFAULT nextval('public."Course_id_seq"'::regclass);
+
+ALTER TABLE ONLY public.crse_instrctr_rel_t ALTER COLUMN crse_instrctr_id SET DEFAULT nextval('public.crse_instrctr_rel_t_crse_instrctr_id_seq'::regclass);
 
 ALTER TABLE ONLY public."Course"
     ADD CONSTRAINT "Course_pkey" PRIMARY KEY (id);

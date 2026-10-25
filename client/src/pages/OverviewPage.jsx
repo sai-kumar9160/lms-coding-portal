@@ -2,6 +2,7 @@ import { BookOpen, Building2, CheckCircle2, PauseCircle, Users } from 'lucide-re
 import { useWorkspace } from '../workspace';
 import { CourseLibrary } from '../components/CourseLibrary';
 import { CollegeDirectory } from '../components/CollegeDirectory';
+import { StudentPerformance } from '../components/StudentPerformance';
 
 export function OverviewPage() {
     const { courses, users, colleges, isStudent, isSuper, inCollege, can } = useWorkspace();
@@ -13,7 +14,7 @@ export function OverviewPage() {
         : [['Available courses', courses.length, BookOpen], [isStudent ? 'Courses started' : 'Campus members', isStudent ? courses.filter(c => c.enrollments.length).length : users.length, Users], [isStudent ? 'Lessons completed' : 'Published courses', isStudent ? completed : courses.filter(c => c.status === 'PUBLISHED').length, CheckCircle2]];
     return <>
         {platformView && <div className="platform-overview-heading"><h1>Platform overview</h1><p>Your colleges, members, and activity at a glance.</p></div>}
-        <section className={`stats${platformView ? ' platform-stats' : ''}`}>{stats.map(([title, count, Icon]) => <div className="stat" key={title}><span className="stat-icon"><Icon size={22}/></span><div><small>{title}</small><strong>{String(count).padStart(2, '0')}</strong></div></div>)}</section>
-        {platformView && can('colleges') ? <CollegeDirectory/> : can('courses') ? <CourseLibrary title="Your learning space"/> : null}
+        {isStudent ? <StudentPerformance/> : <section className={`stats${platformView ? ' platform-stats' : ''}`}>{stats.map(([title, count, Icon]) => <div className="stat" key={title}><span className="stat-icon"><Icon size={22}/></span><div><small>{title}</small><strong>{String(count).padStart(2, '0')}</strong></div></div>)}</section>}
+        {platformView && can('colleges') ? <CollegeDirectory/> : !isStudent && can('courses') ? <CourseLibrary title="Your learning space"/> : null}
     </>;
 }

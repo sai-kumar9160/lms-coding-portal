@@ -5,8 +5,8 @@
 BEGIN;
 
 CREATE TABLE public.file_upld_dtl_t (
-    file_id text NOT NULL,
-    college_id text NOT NULL,
+    file_id integer NOT NULL,
+    college_id integer NOT NULL,
     storage_key_tx text NOT NULL,
     orgnl_file_nm text NOT NULL,
     mime_type_tx text NOT NULL,
@@ -15,14 +15,26 @@ CREATE TABLE public.file_upld_dtl_t (
     purpose_cd public."FilePurpose" NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
-    lesson_id text,
+    lesson_id integer,
     CONSTRAINT file_upld_dtl_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT file_upld_dtl_t_size_bytes_ct_check CHECK ((size_bytes_ct >= 0))
 );
+
+CREATE SEQUENCE public.file_upld_dtl_t_file_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.file_upld_dtl_t_file_id_seq OWNED BY public.file_upld_dtl_t.file_id;
+
+ALTER TABLE ONLY public.file_upld_dtl_t ALTER COLUMN file_id SET DEFAULT nextval('public.file_upld_dtl_t_file_id_seq'::regclass);
 
 ALTER TABLE ONLY public.file_upld_dtl_t
     ADD CONSTRAINT file_upld_dtl_t_pkey PRIMARY KEY (file_id);

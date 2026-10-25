@@ -5,9 +5,9 @@
 BEGIN;
 
 CREATE TABLE public.asmt_lst_t (
-    asmt_id text NOT NULL,
-    college_id text NOT NULL,
-    course_id text,
+    asmt_id integer NOT NULL,
+    college_id integer NOT NULL,
+    course_id integer,
     asmt_type_cd public."AssessmentType" DEFAULT 'QUIZ'::public."AssessmentType" NOT NULL,
     asmt_ttl text NOT NULL,
     instructions_tx text DEFAULT ''::text NOT NULL,
@@ -22,38 +22,74 @@ CREATE TABLE public.asmt_lst_t (
     status_cd public."AssessmentStatus" DEFAULT 'DRAFT'::public."AssessmentStatus" NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT asmt_lst_t_flags_check CHECK (((shuffle_qstn_in = ANY (ARRAY[0, 1])) AND (shuffle_optn_in = ANY (ARRAY[0, 1])) AND (results_published_in = ANY (ARRAY[0, 1])) AND (a_in = ANY (ARRAY[0, 1])))),
-    CONSTRAINT asmt_lst_t_values_check CHECK ((((pass_pct >= 0) AND (pass_pct <= 100)) AND ((max_attempts_ct >= 1) AND (max_attempts_ct <= 20)) AND ((duration_min_ct IS NULL) OR ((duration_min_ct >= 1) AND (duration_min_ct <= 600)))))
+    CONSTRAINT asmt_lst_t_values_check CHECK (((pass_pct >= 0) AND (pass_pct <= 100) AND ((max_attempts_ct >= 1) AND (max_attempts_ct <= 20)) AND ((duration_min_ct IS NULL) OR ((duration_min_ct >= 1) AND (duration_min_ct <= 600)))))
 );
 
+CREATE SEQUENCE public.asmt_lst_t_asmt_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.asmt_lst_t_asmt_id_seq OWNED BY public.asmt_lst_t.asmt_id;
+
 CREATE TABLE public.asmt_qstn_rel_t (
-    asmt_qstn_id text NOT NULL,
-    asmt_id text NOT NULL,
-    qstn_id text NOT NULL,
+    asmt_qstn_id integer NOT NULL,
+    asmt_id integer NOT NULL,
+    qstn_id integer NOT NULL,
     sqnce_id integer DEFAULT 0 NOT NULL,
     marks_override_ct double precision
 );
 
+CREATE SEQUENCE public.asmt_qstn_rel_t_asmt_qstn_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.asmt_qstn_rel_t_asmt_qstn_id_seq OWNED BY public.asmt_qstn_rel_t.asmt_qstn_id;
+
 CREATE TABLE public.asmt_wndw_lst_t (
-    asmt_wndw_id text NOT NULL,
-    asmt_id text NOT NULL,
-    chrt_id text,
+    asmt_wndw_id integer NOT NULL,
+    asmt_id integer NOT NULL,
+    chrt_id integer,
     opens_ts timestamp(3) without time zone NOT NULL,
     closes_ts timestamp(3) without time zone NOT NULL,
     extra_time_min_ct integer DEFAULT 0 NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT asmt_wndw_lst_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT asmt_wndw_lst_t_times_check CHECK (((closes_ts > opens_ts) AND ((extra_time_min_ct >= 0) AND (extra_time_min_ct <= 600))))
 );
+
+CREATE SEQUENCE public.asmt_wndw_lst_t_asmt_wndw_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.asmt_wndw_lst_t_asmt_wndw_id_seq OWNED BY public.asmt_wndw_lst_t.asmt_wndw_id;
+
+ALTER TABLE ONLY public.asmt_lst_t ALTER COLUMN asmt_id SET DEFAULT nextval('public.asmt_lst_t_asmt_id_seq'::regclass);
+
+ALTER TABLE ONLY public.asmt_qstn_rel_t ALTER COLUMN asmt_qstn_id SET DEFAULT nextval('public.asmt_qstn_rel_t_asmt_qstn_id_seq'::regclass);
+
+ALTER TABLE ONLY public.asmt_wndw_lst_t ALTER COLUMN asmt_wndw_id SET DEFAULT nextval('public.asmt_wndw_lst_t_asmt_wndw_id_seq'::regclass);
 
 ALTER TABLE ONLY public.asmt_lst_t
     ADD CONSTRAINT asmt_lst_t_pkey PRIMARY KEY (asmt_id);

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../config/db.config.js';
-import { fileModel } from '../../src/models/file.model.js';
+import { fileMdl } from '../../src/modules/file/models/fileMdl.js';
 import { tmpDir } from '../../src/services/file-storage.service.js';
 import { extractPages } from '../../src/services/pdf-split.service.js';
 
@@ -16,8 +16,8 @@ export async function attachChapterPdfs({ ownerId, collegeId, notesPath, lessons
         const tmp = path.join(tmpDir, randomUUID());
         fs.writeFileSync(tmp, bytes);
         const name = `${lesson.title.replace(/[^\w .&()-]+/g, '').trim().slice(0, 120)} (pages ${first}-${last}).pdf`;
-        const file = await fileModel.store({ id: ownerId }, collegeId, 'DOCUMENT', { path: tmp, originalname: name, size: bytes.length });
-        await db.lesson.update({ where: { id: lesson.id }, data: { lessonType: 'DOCUMENT', fileId: file.id, allowDownload: 1, updatedBy: ownerId } });
+        const file = await fileMdl.store({ id: ownerId }, collegeId, 'DOCUMENT', { path: tmp, originalname: name, size: bytes.length });
+        await db.run(`UPDATE "Lesson" SET lesson_type = 'DOCUMENT', file_id = $2, allow_download_in = 1, updte_usr_id = $3 WHERE id = $1`, [lesson.id, file.id, ownerId]);
         attached++;
     }
     return attached;

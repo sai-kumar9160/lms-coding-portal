@@ -5,8 +5,8 @@
 BEGIN;
 
 CREATE TABLE public.cdng_prblm_lst_t (
-    cdng_prblm_id text NOT NULL,
-    college_id text,
+    cdng_prblm_id integer NOT NULL,
+    college_id integer,
     prblm_slug_tx text NOT NULL,
     prblm_ttl text NOT NULL,
     difficulty_cd public."Difficulty" DEFAULT 'EASY'::public."Difficulty" NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE public.cdng_prblm_lst_t (
     sqnce_id integer DEFAULT 0 NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     checker_cd public."CheckerMode" DEFAULT 'TRIMMED'::public."CheckerMode" NOT NULL,
@@ -34,15 +34,29 @@ CREATE TABLE public.cdng_prblm_lst_t (
     status_cd public."ProblemStatus" DEFAULT 'DRAFT'::public."ProblemStatus" NOT NULL,
     validated_ts timestamp(3) without time zone,
     visibility_cd public."CodingVisibility" DEFAULT 'PRACTICE'::public."CodingVisibility" NOT NULL,
-    CONSTRAINT cdng_prblm_lst_t_judge_check CHECK ((((memory_limit_mb_ct >= 16) AND (memory_limit_mb_ct <= 2048)) AND (epsilon_ct >= (0)::double precision) AND (max_score_ct > (0)::double precision))),
-    CONSTRAINT cdng_prblm_lst_t_values_check CHECK ((((time_limit_ms_ct >= 100) AND (time_limit_ms_ct <= 20000)) AND (a_in = ANY (ARRAY[0, 1]))))
+    track_tx text DEFAULT 'General'::text NOT NULL,
+    starters_json jsonb,
+    pseudocode_tx text,
+    explanation_tx text,
+    CONSTRAINT cdng_prblm_lst_t_judge_check CHECK (((memory_limit_mb_ct >= 16) AND (memory_limit_mb_ct <= 2048) AND (epsilon_ct >= (0)::double precision) AND (max_score_ct > (0)::double precision))),
+    CONSTRAINT cdng_prblm_lst_t_values_check CHECK (((time_limit_ms_ct >= 100) AND (time_limit_ms_ct <= 20000) AND (a_in = ANY (ARRAY[0, 1]))))
 );
 
+CREATE SEQUENCE public.cdng_prblm_lst_t_cdng_prblm_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.cdng_prblm_lst_t_cdng_prblm_id_seq OWNED BY public.cdng_prblm_lst_t.cdng_prblm_id;
+
 CREATE TABLE public.cdng_sbmsn_dtl_t (
-    cdng_sbmsn_id text NOT NULL,
-    college_id text NOT NULL,
-    user_id text NOT NULL,
-    cdng_prblm_id text NOT NULL,
+    cdng_sbmsn_id integer NOT NULL,
+    college_id integer NOT NULL,
+    user_id integer NOT NULL,
+    cdng_prblm_id integer NOT NULL,
     lang_cd text NOT NULL,
     code_tx text NOT NULL,
     status_cd public."SubmissionStatus",
@@ -51,14 +65,14 @@ CREATE TABLE public.cdng_sbmsn_dtl_t (
     runtime_ms_ct integer DEFAULT 0 NOT NULL,
     results_json jsonb,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    atmpt_id text,
+    atmpt_id integer,
     custom_input_tx text,
     job_status_cd public."JudgeStatus" DEFAULT 'QUEUED'::public."JudgeStatus" NOT NULL,
     judged_ts timestamp(3) without time zone,
     kind_cd public."SubmissionKind" DEFAULT 'SUBMIT'::public."SubmissionKind" NOT NULL,
     limits_json jsonb,
     max_score_ct double precision DEFAULT 0 NOT NULL,
-    qstn_id text,
+    qstn_id integer,
     score_ct double precision,
     started_ts timestamp(3) without time zone,
     tries_ct integer DEFAULT 0 NOT NULL,
@@ -67,9 +81,19 @@ CREATE TABLE public.cdng_sbmsn_dtl_t (
     CONSTRAINT cdng_sbmsn_dtl_t_tries_check CHECK ((tries_ct >= 0))
 );
 
+CREATE SEQUENCE public.cdng_sbmsn_dtl_t_cdng_sbmsn_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.cdng_sbmsn_dtl_t_cdng_sbmsn_id_seq OWNED BY public.cdng_sbmsn_dtl_t.cdng_sbmsn_id;
+
 CREATE TABLE public.cdng_tst_cs_lst_t (
-    cdng_tst_cs_id text NOT NULL,
-    cdng_prblm_id text NOT NULL,
+    cdng_tst_cs_id integer NOT NULL,
+    cdng_prblm_id integer NOT NULL,
     input_tx text NOT NULL,
     expected_output_tx text NOT NULL,
     is_sample_in smallint DEFAULT 0 NOT NULL,
@@ -81,6 +105,22 @@ CREATE TABLE public.cdng_tst_cs_lst_t (
     CONSTRAINT cdng_tst_cs_lst_t_sample_check CHECK ((is_sample_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT cdng_tst_cs_lst_t_weight_check CHECK ((weight_ct >= (0)::double precision))
 );
+
+CREATE SEQUENCE public.cdng_tst_cs_lst_t_cdng_tst_cs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.cdng_tst_cs_lst_t_cdng_tst_cs_id_seq OWNED BY public.cdng_tst_cs_lst_t.cdng_tst_cs_id;
+
+ALTER TABLE ONLY public.cdng_prblm_lst_t ALTER COLUMN cdng_prblm_id SET DEFAULT nextval('public.cdng_prblm_lst_t_cdng_prblm_id_seq'::regclass);
+
+ALTER TABLE ONLY public.cdng_sbmsn_dtl_t ALTER COLUMN cdng_sbmsn_id SET DEFAULT nextval('public.cdng_sbmsn_dtl_t_cdng_sbmsn_id_seq'::regclass);
+
+ALTER TABLE ONLY public.cdng_tst_cs_lst_t ALTER COLUMN cdng_tst_cs_id SET DEFAULT nextval('public.cdng_tst_cs_lst_t_cdng_tst_cs_id_seq'::regclass);
 
 ALTER TABLE ONLY public.cdng_prblm_lst_t
     ADD CONSTRAINT cdng_prblm_lst_t_pkey PRIMARY KEY (cdng_prblm_id);

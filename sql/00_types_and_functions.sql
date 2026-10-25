@@ -113,7 +113,8 @@ CREATE TYPE public."Role" AS ENUM (
     'SUPER_ADMIN',
     'COLLEGE_ADMIN',
     'TEACHER',
-    'STUDENT'
+    'STUDENT',
+    'VENDOR'
 );
 
 CREATE TYPE public."ScoringMode" AS ENUM (

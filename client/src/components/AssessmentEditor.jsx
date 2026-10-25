@@ -62,7 +62,7 @@ function QuestionsTab({ assessment, codingProblems, onChanged }) {
     const availableProblems = (codingProblems ?? []).filter(problem => !selectedProblemIds.has(problem.id) && `${problem.title} ${problem.difficulty}`.toLowerCase().includes(problemSearch.trim().toLowerCase()));
     async function addProblem(event) {
         event.preventDefault(); setError('');
-        const problem = (codingProblems ?? []).find(problem => problem.id === problemId);
+        const problem = (codingProblems ?? []).find(problem => String(problem.id) === String(problemId));
         if (!problem || selectedProblemIds.has(problem.id)) return;
         setAddingProblem(true);
         try {

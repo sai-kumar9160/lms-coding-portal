@@ -7,12 +7,12 @@ BEGIN;
 CREATE TABLE public."Session" (
     sid text NOT NULL,
     data text NOT NULL,
-    "userId" text,
+    "userId" integer,
     "expiresAt" timestamp(3) without time zone NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT "Session_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))

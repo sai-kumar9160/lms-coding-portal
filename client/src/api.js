@@ -16,7 +16,20 @@ function remember(data) {
     if (data.csrfToken)
         csrfToken = data.csrfToken;
 }
+// Reads a JSON body, tolerating an empty one (the dev proxy answers with nothing when the backend is down).
+async function readJson(response) {
+    const text = await response.text();
+    if (!text) return {};
+    try { return JSON.parse(text); } catch { return {}; }
+}
+const unreachable = () => new Error('Cannot reach the server. Check that the backend is running (npm run dev) and try again.');
+const failure = (response, data, fallback) => data.message || (response.status >= 500 ? 'The server is not responding. Check that the backend is running.' : fallback);
 async function send(path, method, body) {
+    let response;
+    try { response = await sendRequest(path, method, body); } catch { throw unreachable(); }
+    return response;
+}
+async function sendRequest(path, method, body) {
     const response = await fetch(`/api${path}`, { method, credentials: 'include', cache: 'no-store', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(accessToken ? { 'x-access-token': accessToken } : {}), ...(csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(method) ? { 'x-csrf-token': csrfToken } : {}), ...(collegeContext ? { 'x-college-id': collegeContext } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
     const token = response.ok && response.headers?.get('x-access-token');
     if (token) accessToken = token;
@@ -87,9 +100,9 @@ export async function restoreSession() {
     const response = await send('/auth/session', 'GET');
     if (response.status === 401)
         return null;
-    const data = await response.json();
+    const data = await readJson(response);
     if (!response.ok)
-        throw new Error(data.message || 'Unable to restore session');
+        throw new Error(failure(response, data, 'Unable to restore session'));
     remember(data);
     return data;
 }
@@ -102,28 +115,28 @@ export async function request(path, method = 'GET', body) {
                 // A dev reload or another tab can leave in-memory credentials stale.
                 // Recover the current cookie session's credentials before the CSRF-protected refresh.
                 const session = await send('/auth/session', 'GET');
-                const current = await session.json();
+                const current = await readJson(session);
                 if (!session.ok) {
                     clearAuth();
-                    throw Object.assign(new Error(current.message || 'Session expired'), { status: session.status });
+                    throw Object.assign(new Error(failure(session, current, 'Session expired')), { status: session.status });
                 }
                 remember(current);
                 const refresh = await send('/auth/refresh', 'POST');
-                const data = await refresh.json();
+                const data = await readJson(refresh);
                 if (!refresh.ok) {
                     clearAuth();
-                    throw Object.assign(new Error(data.message || 'Session expired'), { status: refresh.status });
+                    throw Object.assign(new Error(failure(refresh, data, 'Session expired')), { status: refresh.status });
                 }
                 remember(data);
             })().finally(() => { renewing = null; });
         await renewing;
         response = await send(path, method, body);
     }
-    const data = await response.json();
+    const data = await readJson(response);
     if (!response.ok) {
         if (response.status === 401)
             clearAuth();
-        throw Object.assign(new Error(data.message || 'Request failed'), { status: response.status });
+        throw Object.assign(new Error(failure(response, data, 'Request failed')), { status: response.status });
     }
     if (path === '/auth/login')
         remember(data);

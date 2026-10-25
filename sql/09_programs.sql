@@ -5,21 +5,33 @@
 BEGIN;
 
 CREATE TABLE public.prgm_lst_t (
-    prgm_id text NOT NULL,
-    college_id text NOT NULL,
-    dept_id text NOT NULL,
+    prgm_id integer NOT NULL,
+    college_id integer NOT NULL,
+    dept_id integer NOT NULL,
     prgm_cd text NOT NULL,
     prgm_nm text NOT NULL,
     duration_yrs_ct integer NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT prgm_lst_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT prgm_lst_t_duration_check CHECK (((duration_yrs_ct >= 1) AND (duration_yrs_ct <= 10)))
 );
+
+CREATE SEQUENCE public.prgm_lst_t_prgm_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.prgm_lst_t_prgm_id_seq OWNED BY public.prgm_lst_t.prgm_id;
+
+ALTER TABLE ONLY public.prgm_lst_t ALTER COLUMN prgm_id SET DEFAULT nextval('public.prgm_lst_t_prgm_id_seq'::regclass);
 
 ALTER TABLE ONLY public.prgm_lst_t
     ADD CONSTRAINT prgm_lst_t_pkey PRIMARY KEY (prgm_id);

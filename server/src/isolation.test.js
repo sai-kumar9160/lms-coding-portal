@@ -3,18 +3,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findAll, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 test('college isolation, permissions and complete learning workflow', async () => {
     const server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const address = server.address();
     const base = `http://127.0.0.1:${address.port}/api`;
     const created = [];
-    const roleRows = await db.roleMaster.findMany({ orderBy: { id: 'asc' } });
-    assert.deepEqual(roleRows.map(role => role.code), ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'TEACHER', 'STUDENT']);
+    const roleRows = await findAll('roleMaster', {}, 'ORDER BY t.role_id');
+    assert.deepEqual(roleRows.map(role => role.code), ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'TEACHER', 'STUDENT', 'VENDOR']);
     assert.ok(roleRows.every(role => role.activeIndicator === 1));
     const credentials = new Map();
     async function request(path, token = '', method = 'GET', body, host, override = {}) {
@@ -57,18 +57,20 @@ test('college isolation, permissions and complete learning workflow', async () =
             for (const role of ['TEACHER', 'STUDENT']) {
                 assert.equal((await request('/users', token, 'POST', { name: `Test ${role}`, email: `${role.toLowerCase()}@test.local`, mobileNo: role === 'TEACHER' ? '+919000000001' : '+919000000002', password: 'DemoPass123!', role })).status, 201);
             }
+        // Students choose a branch group when registering.
+        const branch = await db.one(`INSERT INTO chrt_lst_t (college_id, chrt_nm) VALUES ($1, 'CSE') RETURNING chrt_id AS id`, [created[0]]);
         const teacher = await login('teacher@test.local', slugs[0]);
         const studentA = await login('student@test.local', slugs[0]);
         const studentB = await login('student@test.local', slugs[1]);
         let registeredStudentId;
         for (const role of ['STUDENT', 'TEACHER']) {
-            const registration = { college: slugs[0], role, name: `Registered ${role}`, email: `registered-${role.toLowerCase()}@test.local`, mobileNo: role === 'TEACHER' ? '+918000000001' : '+918000000002', password: 'DemoPass123!' };
+            const registration = { college: slugs[0], role, name: `Registered ${role}`, email: `registered-${role.toLowerCase()}@test.local`, mobileNo: role === 'TEACHER' ? '+918000000001' : '+918000000002', password: 'DemoPass123!', ...(role === 'STUDENT' ? { branchGroupId: branch.id } : {}) };
             const registered = await request('/auth/register', '', 'POST', registration);
             assert.equal(registered.status, 201);
             assert.equal(registered.data.token, undefined, 'Registration must not automatically log in');
             assert.equal(registered.data.user.mobileNo, registration.mobileNo);
             assert.equal(registered.data.user.password, undefined);
-            const registeredUser = await db.user.findUniqueOrThrow({ where: { id: registered.data.user.id } });
+            const registeredUser = await findOne('user', { id: registered.data.user.id });
             assert.notEqual(registeredUser.password, registration.password);
             assert.equal(registeredUser.createdBy, registeredUser.id);
             assert.equal(registeredUser.roleId, role === 'TEACHER' ? 3 : 4);
@@ -85,7 +87,7 @@ test('college isolation, permissions and complete learning workflow', async () =
                 assert.equal((await request(`/users/${registeredUser.id}/approve`, adminB, 'POST')).status, 404, 'Other colleges cannot approve');
                 assert.equal((await request(`/users/${registeredUser.id}/approve`, adminA, 'POST')).status, 200);
                 assert.equal((await request(`/users/${registeredUser.id}/approve`, adminA, 'POST')).status, 404, 'Only pending users can be approved');
-                const approved = await db.user.findUniqueOrThrow({ where: { id: registeredUser.id } });
+                const approved = await findOne('user', { id: registeredUser.id });
                 assert.equal(approved.status, 'ACTIVE');
                 assert.ok(approved.updatedBy);
             }
@@ -114,13 +116,13 @@ test('college isolation, permissions and complete learning workflow', async () =
         const course = await request('/courses', teacher, 'POST', { title: 'Test JavaScript', description: 'Test course description', moduleTitle: 'Introduction', lessonTitle: 'Hello world', content: 'Run console.log("Hello world");' });
         assert.equal(course.status, 201);
         const teacherId = (await request('/me', teacher)).data.user.id;
-        const insertedCourse = await db.course.findUniqueOrThrow({ where: { id: course.data.id } });
+        const insertedCourse = await findOne('course', { id: course.data.id });
         assert.equal(insertedCourse.createdBy, teacherId);
         assert.equal(insertedCourse.activeIndicator, 1);
         assert.equal(insertedCourse.updatedAt, null, 'u_ts stays null until the first update');
         assert.equal((await ownCourses(studentA, 0)).length, 0);
         assert.equal((await request(`/courses/${course.data.id}`, teacher, 'PATCH', { status: 'PUBLISHED' })).status, 200);
-        const publishedCourse = await db.course.findUniqueOrThrow({ where: { id: course.data.id } });
+        const publishedCourse = await findOne('course', { id: course.data.id });
         assert.equal(publishedCourse.updatedBy, teacherId);
         assert.ok(publishedCourse.updatedAt);
         assert.equal(publishedCourse.createdAt.getTime(), insertedCourse.createdAt.getTime());
@@ -138,7 +140,7 @@ test('college isolation, permissions and complete learning workflow', async () =
         assert.equal((await request(coursePath, teacher, 'PATCH', { title: 'Updated JavaScript course', description: 'Updated course description' })).status, 200);
         assert.equal((await request(modulePath, teacher, 'PATCH', { title: 'Working with functions', position: 1 })).status, 200);
         assert.equal((await request(lessonPath, teacher, 'PATCH', { title: 'Function arguments', content: 'Pass arguments to a function and return a result.', position: 0 })).status, 200);
-        const editedLesson = await db.lesson.findUniqueOrThrow({ where: { id: newLesson.data.id } });
+        const editedLesson = await findOne('lesson', { id: newLesson.data.id });
         assert.equal(editedLesson.updatedBy, teacherId);
         assert.ok(editedLesson.updatedAt);
         assert.equal((await request(`${coursePath}/modules`, studentA, 'POST', { title: 'Unauthorized' })).status, 403);
@@ -156,7 +158,7 @@ test('college isolation, permissions and complete learning workflow', async () =
         assert.equal((await request(tempModulePath, adminB, 'DELETE')).status, 404, 'Other colleges cannot delete modules');
         assert.equal((await request(tempLessonPath, teacher, 'DELETE')).status, 200);
         assert.equal((await request(tempLessonPath, teacher, 'DELETE')).status, 404, 'Deleted lessons stay deleted');
-        const deletedLesson = await db.lesson.findUniqueOrThrow({ where: { id: tempLesson.data.id } });
+        const deletedLesson = await findOne('lesson', { id: tempLesson.data.id });
         assert.equal(deletedLesson.activeIndicator, 0);
         assert.ok(deletedLesson.deletedAt, 'd_ts is set on soft delete');
         assert.equal(deletedLesson.updatedBy, teacherId);
@@ -169,34 +171,34 @@ test('college isolation, permissions and complete learning workflow', async () =
         assert.equal(studentCourses[0].modules[1].lessons[0].content, 'Pass arguments to a function and return a result.');
         const courses = await request('/courses', studentA);
         const lessonId = courses.data[0].modules[0].lessons[0].id;
-        assert.equal((await db.lesson.findUniqueOrThrow({ where: { id: lessonId } })).createdBy, teacherId);
-        assert.equal((await db.courseModule.findFirstOrThrow({ where: { courseId: course.data.id } })).createdBy, teacherId);
+        assert.equal((await findOne('lesson', { id: lessonId })).createdBy, teacherId);
+        assert.equal((await findOne('courseModule', { courseId: course.data.id })).createdBy, teacherId);
         assert.equal((await request(`/courses/${course.data.id}`, adminB, 'PATCH', { status: 'DRAFT' })).status, 404);
         assert.equal((await ownCourses(studentB, 1)).length, 0);
         assert.equal((await request('/courses', studentA, 'GET', undefined, `${slugs[1]}.localhost`)).status, 401);
         // No enrollment step: completing creates the progress record once, even when repeated.
-        assert.equal(await db.enrollment.count({ where: { collegeId: created[0] } }), 0);
+        assert.equal(await countRows('enrollment', { collegeId: created[0] }), 0);
         for (let n = 0; n < 2; n++)
             assert.equal((await request(`/lessons/${lessonId}/complete`, studentA, 'POST')).status, 200);
-        assert.equal(await db.enrollment.count({ where: { collegeId: created[0] } }), 1);
-        assert.equal((await db.enrollment.findFirstOrThrow({ where: { collegeId: created[0] } })).progressPct, 50);
-        assert.equal(await db.lessonProgress.count({ where: { collegeId: created[0] } }), 1);
+        assert.equal(await countRows('enrollment', { collegeId: created[0] }), 1);
+        assert.equal((await findOne('enrollment', { collegeId: created[0] })).progressPct, 50);
+        assert.equal(await countRows('lessonProgress', { collegeId: created[0] }), 1);
         assert.equal((await request(`/lessons/${lessonId}/complete`, studentB, 'POST')).status, 404);
         assert.equal((await ownCourses(studentA, 0))[0].modules[0].lessons[0].progress.length, 1);
         const studentId = (await request('/me', studentA)).data.user.id;
-        assert.equal((await db.enrollment.findFirstOrThrow({ where: { courseId: course.data.id } })).createdBy, studentId);
-        assert.equal((await db.lessonProgress.findFirstOrThrow({ where: { lessonId } })).createdBy, studentId);
-        await db.course.update({ where: { id: course.data.id }, data: { activeIndicator: 0, updatedBy: teacherId } });
-        assert.ok((await db.course.findUniqueOrThrow({ where: { id: course.data.id } })).deletedAt, 'd_ts is set on deactivation');
+        assert.equal((await findOne('enrollment', { courseId: course.data.id })).createdBy, studentId);
+        assert.equal((await findOne('lessonProgress', { lessonId })).createdBy, studentId);
+        await change('course', { id: course.data.id }, { activeIndicator: 0, updatedBy: teacherId });
+        assert.ok((await findOne('course', { id: course.data.id })).deletedAt, 'd_ts is set on deactivation');
         assert.equal((await ownCourses(studentA, 0)).length, 0);
         assert.equal((await request(`/lessons/${lessonId}/complete`, studentA, 'POST')).status, 404);
-        await db.course.update({ where: { id: course.data.id }, data: { activeIndicator: 1, updatedBy: teacherId } });
-        assert.equal((await db.course.findUniqueOrThrow({ where: { id: course.data.id } })).deletedAt, null);
-        await db.user.update({ where: { id: studentId }, data: { activeIndicator: 0 } });
+        await change('course', { id: course.data.id }, { activeIndicator: 1, updatedBy: teacherId });
+        assert.equal((await findOne('course', { id: course.data.id })).deletedAt, null);
+        await change('user', { id: studentId }, { activeIndicator: 0 });
         assert.equal((await request('/courses', studentA)).status, 401);
         assert.equal((await request('/auth/refresh', studentA, 'POST')).status, 401);
         assert.equal((await request('/auth/login', '', 'POST', { email: 'student@test.local', college: slugs[0], password: 'DemoPass123!' })).status, 401);
-        await db.user.update({ where: { id: studentId }, data: { activeIndicator: 1 } });
+        await change('user', { id: studentId }, { activeIndicator: 1 });
         // College Admins deactivate teachers and students; sessions are revoked immediately.
         const registeredStudent = await login('registered-student@test.local', slugs[0]);
         const adminAId = (await request('/me', adminA)).data.user.id;
@@ -204,12 +206,12 @@ test('college isolation, permissions and complete learning workflow', async () =
         assert.equal((await request(`/users/${registeredStudentId}`, teacher, 'DELETE')).status, 403);
         assert.equal((await request(`/users/${registeredStudentId}`, adminB, 'DELETE')).status, 404, 'Other colleges cannot deactivate users');
         assert.equal((await request(`/users/${registeredStudentId}`, adminA, 'DELETE')).status, 200);
-        assert.equal(await db.session.count({ where: { userId: registeredStudentId } }), 0);
+        assert.equal(await countRows('session', { userId: registeredStudentId }), 0);
         assert.equal((await request('/courses', registeredStudent)).status, 401);
         assert.equal((await request('/auth/login', '', 'POST', { email: 'registered-student@test.local', college: slugs[0], password: 'DemoPass123!' })).status, 401);
         assert.ok(!(await request('/users', adminA)).data.some(u => u.id === registeredStudentId));
         // Platform accounts have no college, so their emails need the partial unique index.
-        await assert.rejects(db.user.create({ data: { name: 'Duplicate', email: 'super@lms.local', password: 'not-a-login', role: 'SUPER_ADMIN' } }), { code: 'P2002' });
+        await assert.rejects(db.run(`INSERT INTO "User" (id, name, email, password, role) VALUES (DEFAULT, 'Duplicate', 'super@lms.local', 'not-a-login', 'SUPER_ADMIN')`), { code: '23505' });
         assert.equal((await request(`/colleges/${created[0]}`, superToken, 'PATCH', { active: false })).status, 200);
         assert.equal((await request('/courses', studentA)).status, 403);
         assert.equal((await request('/auth/login', '', 'POST', { college: slugs[0], email: 'student@test.local', password: 'DemoPass123!' })).status, 401);
@@ -225,32 +227,33 @@ test('college isolation, permissions and complete learning workflow', async () =
         assert.equal((await request('/auth/refresh', renewed.data.token, 'POST')).status, 401, 'Logout cannot be reversed by refresh');
         const idleToken = await login('student@test.local', slugs[1]);
         const idleClaims = jwt.decode(idleToken);
-        await db.session.update({ where: { sid: idleClaims.sid }, data: { expiresAt: new Date(Date.now() - 1000) } });
+        await change('session', { sid: idleClaims.sid }, { expiresAt: new Date(Date.now() - 1000) });
         assert.equal((await request('/courses', idleToken)).status, 401, 'Idle expiry blocks valid JWT');
         assert.equal((await request('/auth/refresh', idleToken, 'POST')).status, 401);
         const absoluteToken = await login('student@test.local', slugs[1]);
         const absoluteClaims = jwt.decode(absoluteToken);
-        const absoluteSession = await db.session.findUniqueOrThrow({ where: { sid: absoluteClaims.sid } });
+        const absoluteSession = await findOne('session', { sid: absoluteClaims.sid });
         const absoluteData = JSON.parse(absoluteSession.data);
         absoluteData.absoluteExpiresAt = Date.now() - 1000;
-        await db.session.update({ where: { sid: absoluteClaims.sid }, data: { data: JSON.stringify(absoluteData) } });
+        await change('session', { sid: absoluteClaims.sid }, { data: JSON.stringify(absoluteData) });
         assert.equal((await request('/auth/refresh', absoluteToken, 'POST')).status, 401, 'Refresh cannot extend the absolute deadline');
     }
     finally {
-        const testUsers = await db.user.findMany({ where: { collegeId: { in: created } }, select: { id: true } });
+        const testUsers = await findAll('user', { collegeId: created });
         const sessionIds = [...credentials.keys()].map(t => jwt.decode(t)?.sid).filter((sid) => typeof sid === 'string');
-        await db.session.deleteMany({ where: { OR: [{ userId: { in: testUsers.map(u => u.id) } }, { sid: { in: sessionIds } }] } });
-        await db.lessonProgress.deleteMany({ where: { collegeId: { in: created } } });
-        await db.enrollment.deleteMany({ where: { collegeId: { in: created } } });
-        await db.course.deleteMany({ where: { collegeId: { in: created } } });
-        await db.fileUpload.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: null, name: 'Duplicate', password: 'not-a-login' } });
+        await db.run('DELETE FROM "Session" WHERE "userId" = ANY($1::int[]) OR sid = ANY($2::text[])', [testUsers.map(u => u.id), sessionIds]);
+        await remove('lessonProgress', { collegeId: created });
+        await remove('cohortMember', { collegeId: created });
+        await remove('cohort', { collegeId: created });
+        await remove('enrollment', { collegeId: created });
+        await remove('course', { collegeId: created });
+        await remove('fileUpload', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('college', { id: created });
+        await remove('user', { collegeId: null, name: 'Duplicate', password: 'not-a-login' });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
     process.exitCode = 0;
 });

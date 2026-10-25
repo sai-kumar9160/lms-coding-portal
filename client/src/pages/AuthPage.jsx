@@ -5,9 +5,9 @@ import { request } from '../api';
 import { PasswordInput } from '../components/PasswordInput';
 
 const headings = {
-    register: ['Create your NextByte account.', 'Join your college as a student or teacher.'],
+    register: ['Create your NextByte account.', 'Join your institute as a student or teacher.'],
     login: ['Sign in to NextByte.', 'Continue your learning journey.'],
-    forgot: ['Forgot your password?', 'Enter your college code and email. We will send you a link to choose a new password.'],
+    forgot: ['Forgot your password?', 'Enter your institute code and email. We will send you a link to choose a new password.'],
     reset: ['Choose a new password.', 'Use at least 10 characters. You will be signed out on other devices.'],
 };
 const submitLabels = { register: 'Create account', login: 'Sign in', forgot: 'Send reset link', reset: 'Save new password' };
@@ -17,7 +17,10 @@ export function AuthPage({ onLogin }) {
     const location = useLocation();
     const navigate = useNavigate();
     const resetToken = location.pathname === '/reset-password' ? new URLSearchParams(location.search).get('token') : null;
-    const [mode, setMode] = useState(location.pathname === '/reset-password' ? 'reset' : 'login');
+    const query = new URLSearchParams(location.search);
+    // /login?mode=register opens the sign-up tab; /login?as=vendor is the partner sign-in (no institute code).
+    const [mode, setMode] = useState(location.pathname === '/reset-password' ? 'reset' : query.get('mode') === 'register' ? 'register' : 'login');
+    const vendorLogin = query.get('as') === 'vendor' && mode === 'login';
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
@@ -97,28 +100,30 @@ export function AuthPage({ onLogin }) {
     </section>
     <section className="login-panel"><div className="login-form auth-card">
       <span className="eyebrow">WELCOME TO NEXTBYTE</span>
-      {mode === 'register' || mode === 'login'
+      {vendorLogin
+        ? <button type="button" className="text-button back-link" onClick={() => navigate('/')}>← Back to NextByte</button>
+        : mode === 'register' || mode === 'login'
         ? <div className="auth-tabs"><button type="button" disabled={busy} aria-pressed={mode === 'register'} onClick={() => switchMode('register')}>Register</button><button type="button" disabled={busy} aria-pressed={mode === 'login'} onClick={() => switchMode('login')}>Sign in</button></div>
         : <button type="button" className="text-button back-link" disabled={busy} onClick={() => { if (mode === 'reset') navigate('/', { replace: true }); switchMode('login'); }}>← Back to sign in</button>}
-      <h2>{headings[mode][0]}</h2>
-      <p className="muted">{headings[mode][1]}</p>
+      <h2>{vendorLogin ? 'Vendor sign in.' : headings[mode][0]}</h2>
+      <p className="muted">{vendorLogin ? 'Partner accounts are created by the platform admin. No institute code is needed.' : headings[mode][1]}</p>
       {error && <div role="alert" className="alert">{error}</div>}
       {notice && <div role="status" className="success">{notice}</div>}
       {mode === 'reset' && !resetToken && <div role="alert" className="alert">This reset link is incomplete. Request a new one.</div>}
       {/* Keyed by mode, so the fields fade in again when switching Register / Sign in / Forgot password. */}
       <form key={mode} className="auth-fields" onSubmit={submit}>
-        {mode !== 'reset' && <label>College code<input name="college" value={college} onChange={e => setCollege(e.target.value)} required={mode === 'register'} placeholder={mode === 'register' ? 'Enter your college code, e.g. alpha' : 'Leave empty for platform admin'}/>
-          {college.trim() && <span className={`college-hint${lookupError ? ' error' : ''}`} role="status" aria-live="polite">{lookupError || collegeName || 'Looking up college…'}</span>}
+        {mode !== 'reset' && !vendorLogin && <label>Institute code<input name="college" value={college} onChange={e => setCollege(e.target.value)} required={mode === 'register'} placeholder={mode === 'register' ? 'Enter your institute code, e.g. srk123' : 'Leave empty for platform admin'}/>
+          {college.trim() && <span className={`college-hint${lookupError ? ' error' : ''}`} role="status" aria-live="polite">{lookupError || collegeName || 'Looking up institute…'}</span>}
         </label>}
         {mode === 'register' && <>
           <div className="field-row"><label>Full name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Your full name"/></label><label>Register as<select name="role" value={role} onChange={event => setRole(event.target.value)}><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option></select></label></div>
           {role === 'STUDENT' && <label>Branch<select name="branchGroupId" required value={branchGroupId} disabled={!collegeName} onChange={event => setBranchGroupId(event.target.value)}><option value="">Choose your branch</option>{(lookupCurrent ? collegeLookup.branches ?? [] : []).map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
-            <span className="college-hint">{!collegeName ? 'Enter a valid college code to load branches.' : !collegeLookup.branches?.length ? 'No branch groups are available. Ask your college admin to create them in Academics.' : 'You will join this branch group for assessments.'}</span>
+            <span className="college-hint">{!collegeName ? 'Enter a valid institute code to load branches.' : !collegeLookup.branches?.length ? 'No branch groups are available. Ask your institute admin to create them in Academics.' : 'You will join this branch group for assessments.'}</span>
           </label>}
-          <div className="field-row"><label>Mobile number<input name="mobileNo" type="tel" required autoComplete="tel" maxLength={25} placeholder="e.g. +919876543210"/></label><label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@college.edu"/></label></div>
+          <div className="field-row"><label>Mobile number<input name="mobileNo" type="tel" required autoComplete="tel" maxLength={25} placeholder="e.g. +919876543210"/></label><label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label></div>
           <div className="field-row"><label>Password<PasswordInput name="password" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="At least 10 characters"/></label><label>Confirm password<PasswordInput name="confirmPassword" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="Enter it again"/></label></div>
         </>}
-        {(mode === 'login' || mode === 'forgot') && <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@college.edu"/></label>}
+        {(mode === 'login' || mode === 'forgot') && <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label>}
         {mode === 'login' && <label>Password<PasswordInput name="password" required minLength={1} maxLength={100} autoComplete="current-password" placeholder="Enter your password"/>
           <button type="button" className="text-button forgot-link" disabled={busy} onClick={() => switchMode('forgot')}>Forgot password?</button>
         </label>}

@@ -2,12 +2,12 @@ import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 import { gradeAnswer, totalAttempt } from './services/grading.service.js';
 process.env.NODE_ENV = 'test';
-const { app, db: appDb } = await import('./index.js');
-const { sweepExpired } = await import('./models/attempt.model.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
+const { sweepExpired } = await import('./modules/assessment/models/attemptMdl.js');
 
 test('grading rules', () => {
     const options = [{ id: 'a', isCorrect: 1 }, { id: 'b', isCorrect: 0 }, { id: 'c', isCorrect: 1 }];
@@ -134,7 +134,7 @@ test('assessments: question bank, windows, attempts, grading and auto-submit', a
         // Second attempt runs out of time and is auto-submitted by the sweep.
         const second = await ok(request(`/assessments/${exam.id}/attempts`, s1, 'POST'), 201, 'second');
         assert.equal(second.attemptNo, 2);
-        await db.attempt.update({ where: { id: second.id }, data: { expiresAt: new Date(Date.now() - 60000) } });
+        await change('attempt', { id: second.id }, { expiresAt: new Date(Date.now() - 60000) });
         assert.ok(await sweepExpired() >= 1);
         const expired = (await request(`/attempts/${second.id}`, s1)).data;
         assert.equal(expired.status, 'AUTO_SUBMITTED');
@@ -153,16 +153,15 @@ test('assessments: question bank, windows, attempts, grading and auto-submit', a
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
-        await db.attempt.deleteMany({ where: { collegeId: { in: created } } });
-        await db.assessment.deleteMany({ where: { collegeId: { in: created } } });
-        await db.question.deleteMany({ where: { collegeId: { in: created } } });
-        await db.cohort.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
+        await remove('session', { sid: sids });
+        await remove('attempt', { collegeId: created });
+        await remove('assessment', { collegeId: created });
+        await remove('question', { collegeId: created });
+        await remove('cohort', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('college', { id: created });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

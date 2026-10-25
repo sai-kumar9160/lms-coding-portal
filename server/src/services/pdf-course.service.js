@@ -4,7 +4,7 @@ import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { db } from '../../config/db.config.js';
-import { fileModel } from '../models/file.model.js';
+import { fileMdl } from '../modules/file/models/fileMdl.js';
 import { tmpDir } from './file-storage.service.js';
 import { extractPages } from './pdf-split.service.js';
 import { createLogger } from '../utils/logger.js';
@@ -47,18 +47,21 @@ function convert(pdfPath) {
 async function storeBuffer(identity, collegeId, purpose, bytes, name, options) {
     const tmp = path.join(tmpDir, randomUUID());
     fs.writeFileSync(tmp, bytes);
-    return fileModel.store(identity, collegeId, purpose, { path: tmp, originalname: name, size: bytes.length }, options);
+    return fileMdl.store(identity, collegeId, purpose, { path: tmp, originalname: name, size: bytes.length }, options);
 }
 
 // Creates the units and lessons of a course from converted PDF output: each lesson gets its formatted text,
 // its figures (as lesson images) and its own pages of the PDF. Returns counts.
 async function buildUnits(identity, collegeId, courseId, units, outdir, pdfPath) {
-    const audit = { collegeId, createdBy: identity.id };
     let images = 0, lessons = 0;
     for (const [m, unit] of units.entries()) {
-        const module = await db.courseModule.create({ data: { courseId, title: unit.title, position: m, ...audit } });
+        const module = await db.one(
+            `INSERT INTO "CourseModule" (id, "collegeId", "courseId", title, position, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, $4, $5) RETURNING id`,
+            [collegeId, courseId, unit.title, m, identity.id]);
         for (const [l, entry] of unit.lessons.entries()) {
-            const lesson = await db.lesson.create({ data: { moduleId: module.id, title: entry.title, position: l, content: '', contentFormat: 'MARKDOWN', ...audit } });
+            const lesson = await db.one(
+                `INSERT INTO "Lesson" (id, "collegeId", "moduleId", title, position, content, content_fmt_cd, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, $4, '', 'MARKDOWN', $5) RETURNING id`,
+                [collegeId, module.id, entry.title, l, identity.id]);
             let markdown = fs.readFileSync(path.join(outdir, entry.markdown), 'utf8').replace(/\r\n/g, '\n');
             for (const name of entry.images) {
                 const file = await storeBuffer(identity, collegeId, 'IMAGE', fs.readFileSync(path.join(outdir, name)), name, { lessonId: lesson.id });
@@ -67,7 +70,7 @@ async function buildUnits(identity, collegeId, courseId, units, outdir, pdfPath)
             }
             const [first, last] = entry.pages;
             const chapter = await storeBuffer(identity, collegeId, 'DOCUMENT', await extractPages(pdfPath, first, last, entry.title), `${entry.title.replace(/[^\w .&()-]+/g, '').trim().slice(0, 100) || 'chapter'} (pages ${first}-${last}).pdf`);
-            await db.lesson.update({ where: { id: lesson.id }, data: { content: markdown, lessonType: 'DOCUMENT', fileId: chapter.id, allowDownload: 1 } });
+            await db.run(`UPDATE "Lesson" SET content = $2, lesson_type = 'DOCUMENT', file_id = $3, allow_download_in = 1 WHERE id = $1`, [lesson.id, markdown, chapter.id]);
             lessons++;
         }
     }
@@ -99,12 +102,16 @@ async function withConversion(pdfPath, work) {
 // the whole PDF is linked as the course's syllabus / notes file. pdf = { fileId, path } of the stored upload.
 export async function createCourseFromPdf(identity, collegeId, input, pdf) {
     return withConversion(pdf.path, async (units, outdir) => {
-        const audit = { collegeId, createdBy: identity.id };
-        const course = await db.course.create({ data: {
-            title: input.title, description: input.description || `Course created from ${input.fileName}.`, code: input.code ?? null, level: input.level ?? null,
-            syllabusFileId: pdf.fileId, teacherId: identity.id, ...audit,
-            instructors: { create: { userId: identity.id, role: 'OWNER', ...audit } },
-        } });
+        const course = await db.transaction(async tx => {
+            const created = await tx.one(
+                `INSERT INTO "Course" (id, "collegeId", title, description, course_cd, level_cd, syllabus_file_id, "teacherId", crte_usr_id)
+                 VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $7) RETURNING id, title`,
+                [collegeId, input.title, input.description || `Course created from ${input.fileName}.`, input.code ?? null, input.level ?? null, pdf.fileId, identity.id]);
+            await tx.run(
+                `INSERT INTO crse_instrctr_rel_t (crse_instrctr_id, college_id, course_id, user_id, instrctr_role_cd, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, 'OWNER', $3)`,
+                [collegeId, created.id, identity.id]);
+            return created;
+        });
         try {
             const counts = await buildUnits(identity, collegeId, course.id, units, outdir, pdf.path);
             log.info('Course created from PDF', { courseId: course.id, ...counts, userId: identity.id });
@@ -112,7 +119,7 @@ export async function createCourseFromPdf(identity, collegeId, input, pdf) {
         }
         catch (error) {
             // Never leave a half-built course behind.
-            await db.course.update({ where: { id: course.id }, data: { activeIndicator: 0, updatedBy: identity.id } }).catch(() => {});
+            await db.run('UPDATE "Course" SET a_in = 0, updte_usr_id = $2 WHERE id = $1', [course.id, identity.id]).catch(() => {});
             throw error;
         }
     });
@@ -123,16 +130,16 @@ export async function createCourseFromPdf(identity, collegeId, input, pdf) {
 // Student progress on the replaced lessons does not carry over.
 export async function rebuildCourseFromPdf(identity, collegeId, course, pdfPath) {
     return withConversion(pdfPath, async (units, outdir) => {
-        const oldModules = await db.courseModule.findMany({ where: { courseId: course.id, activeIndicator: 1 }, select: { id: true } });
+        const oldModules = await db.many('SELECT id FROM "CourseModule" WHERE "courseId" = $1 AND a_in = 1', [course.id]);
         try {
             const counts = await buildUnits(identity, collegeId, course.id, units, outdir, pdfPath);
-            await db.courseModule.updateMany({ where: { id: { in: oldModules.map(m => m.id) } }, data: { activeIndicator: 0, updatedBy: identity.id } });
+            await db.run('UPDATE "CourseModule" SET a_in = 0, updte_usr_id = $2 WHERE id = ANY($1::int[])', [oldModules.map(m => m.id), identity.id]);
             log.info('Course rebuilt from PDF', { courseId: course.id, ...counts, userId: identity.id });
             return { id: course.id, title: course.title, ...counts };
         }
         catch (error) {
             // Remove any half-built new units; the old ones are still active.
-            await db.courseModule.updateMany({ where: { courseId: course.id, activeIndicator: 1, id: { notIn: oldModules.map(m => m.id) } }, data: { activeIndicator: 0, updatedBy: identity.id } }).catch(() => {});
+            await db.run('UPDATE "CourseModule" SET a_in = 0, updte_usr_id = $3 WHERE "courseId" = $1 AND a_in = 1 AND id <> ALL($2::int[])', [course.id, oldModules.map(m => m.id), identity.id]).catch(() => {});
             throw error;
         }
     });

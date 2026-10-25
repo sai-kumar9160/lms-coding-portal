@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { restoreSession } from './api';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import { AppLayout } from './components/AppLayout';
 import { AuthPage } from './pages/AuthPage';
+import { HomePage } from './pages/HomePage';
+import { InstituteLandingPage } from './pages/InstituteLandingPage';
+import { StudentLandingPage } from './pages/StudentLandingPage';
+import { PathsPage } from './pages/PathsPage';
+import { AboutPage } from './pages/AboutPage';
 import { menuPages, pageRegistry } from './pages/registry';
 
 // Routes exist only for menu items the role can view, so unpermitted URLs redirect to the first page.
@@ -24,15 +29,23 @@ export function App() {
     const [booting, setBooting] = useState(true);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { pathname } = useLocation();
     useEffect(() => { restoreSession().then(data => { if (data)
         setToken(data.token); }).catch(e => setError(e.message)).finally(() => setBooting(false)); }, []);
     if (booting)
         return <div className="loading">Restoring your campus session…</div>;
     if (!token)
-        return <>{error && <div role="alert" className="alert">{error}</div>}<Routes>
+        // The public home page stays clean; the banner shows on the sign-in screens.
+        return <>{error && pathname !== '/' && <div role="alert" className="alert">{error}</div>}<Routes>
+            <Route path="/" element={<HomePage/>}/>
+            <Route path="/institutes" element={<InstituteLandingPage/>}/>
+            <Route path="/colleges" element={<Navigate to="/institutes" replace/>}/>
+            <Route path="/paths" element={<PathsPage/>}/>
+            <Route path="/about" element={<AboutPage/>}/>
+            <Route path="/students" element={<StudentLandingPage/>}/>
             <Route path="/login" element={<AuthPage onLogin={newToken => { setError(''); setToken(newToken); navigate('/overview', { replace: true }); }}/>}/>
             <Route path="/reset-password" element={<AuthPage onLogin={newToken => { setToken(newToken); navigate('/overview', { replace: true }); }}/>}/>
-            <Route path="*" element={<Navigate to="/login" replace/>}/>
+            <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes></>;
     return <WorkspaceProvider key={token} onSignedOut={() => { setToken(''); navigate('/login', { replace: true }); }}><MenuRoutes/></WorkspaceProvider>;
 }

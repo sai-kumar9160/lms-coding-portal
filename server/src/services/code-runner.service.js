@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { codeRunnerConfig as config } from '../../config/code-runner.config.js';
 import { createLogger } from '../utils/logger.js';
 import { fail } from '../utils/http-error.js';
@@ -9,6 +10,9 @@ import { fail } from '../utils/http-error.js';
 const log = createLogger('code-runner');
 const exe = process.platform === 'win32' ? 'main.exe' : './main';
 const { commands } = config;
+// SQL, HTML & CSS, Git, Dockerfile and YAML are judged by small scripts in server/judge, and React by a Node script there.
+// They need only Python and Node (and git, for the Git track); nothing a student writes in those tracks runs other than React and shell code.
+const judgeScript = name => path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'judge', name);
 
 // Each language: source file name, optional compile step, run command, Judge0 language id.
 // Java and C# programs must use a class named Main. Languages without `run` are offered only through Judge0.
@@ -18,6 +22,13 @@ const LANGUAGES = {
     c: { label: 'C (GCC)', file: 'main.c', check: [commands.gcc, ['--version']], compile: [commands.gcc, ['-O2', '-std=c17', '-o', exe, 'main.c', '-lm']], run: [exe, []], judge0: 50 },
     cpp: { label: 'C++17 (G++)', file: 'main.cpp', check: [commands.gxx, ['--version']], compile: [commands.gxx, ['-O2', '-std=c++17', '-o', exe, 'main.cpp']], run: [exe, []], judge0: 54 },
     javascript: { label: 'JavaScript (Node.js)', file: 'main.js', check: [commands.node, ['--version']], run: [commands.node, ['--max-old-space-size=256', 'main.js']], judge0: 63 },
+    sql: { label: 'SQL (SQLite)', file: 'main.sql', check: [commands.python, ['--version']], run: [commands.python, ['-I', '-X', 'utf8', judgeScript('sql-judge.py'), 'main.sql']], judge0: 82 },
+    html: { label: 'HTML & CSS', file: 'index.html', check: [commands.python, ['--version']], run: [commands.python, ['-I', '-X', 'utf8', judgeScript('html-judge.py'), 'index.html']] },
+    react: { label: 'React (JSX)', file: 'App.jsx', check: [commands.node, ['--version']], run: [commands.node, [judgeScript('react-judge.mjs'), 'App.jsx', commands.python]] },
+    git: { label: 'Git commands', file: 'commands.txt', check: ['git', ['--version']], run: [commands.python, ['-I', '-X', 'utf8', judgeScript('git-judge.py'), 'commands.txt']] },
+    bash: { label: 'Bash (shell)', file: 'main.sh', check: ['bash', ['--version']], run: ['bash', ['main.sh']], judge0: 46 },
+    dockerfile: { label: 'Dockerfile', file: 'Dockerfile', check: [commands.python, ['--version']], run: [commands.python, ['-I', '-X', 'utf8', judgeScript('devops-judge.py'), 'dockerfile', 'Dockerfile']] },
+    yaml: { label: 'YAML (CI, Compose, Kubernetes)', file: 'config.yml', check: [commands.python, ['--version']], run: [commands.python, ['-I', '-X', 'utf8', judgeScript('devops-judge.py'), 'yaml', 'config.yml']] },
     csharp: { label: 'C#', file: 'Main.cs', judge0: 51 },
     go: { label: 'Go', file: 'main.go', check: ['go', ['version']], compile: ['go', ['build', '-o', exe, 'main.go']], run: [exe, []], judge0: 60, timeFactor: 1.5 },
     kotlin: { label: 'Kotlin', file: 'Main.kt', judge0: 78, timeFactor: 2 },
@@ -30,7 +41,7 @@ let detected;
 export function languages() {
     detected ??= Object.entries(LANGUAGES).map(([id, lang]) => ({
         id, label: lang.label,
-        available: config.mode === 'judge0' || (config.mode === 'local' && Boolean(lang.run) && !spawnSync(lang.check[0], lang.check[1], { timeout: 10000, windowsHide: true }).error),
+        available: (config.mode === 'judge0' && Boolean(lang.judge0)) || (config.mode === 'local' && Boolean(lang.run) && !spawnSync(lang.check[0], lang.check[1], { timeout: 10000, windowsHide: true }).error),
     }));
     return detected;
 }

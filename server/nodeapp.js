@@ -11,7 +11,7 @@ const server = app.listen(port, '0.0.0.0', () => {
     log.info(`LMS backend running at http://localhost:${port}`);
 });
 // Auto-submit assessment attempts whose time ran out while the student was away.
-const { sweepExpired } = await import('./src/models/attempt.model.js');
+const { sweepExpired } = await import('./src/modules/assessment/models/attemptMdl.js');
 setInterval(() => sweepExpired().then(count => count && log.info(`Auto-submitted ${count} expired attempt(s)`), error => log.error('Attempt sweep failed', { error: error.message })), 60000).unref();
 // Coding judge: runs inside this process unless JUDGE_WORKER=off (then start `node judge-worker.js` separately).
 if ((process.env.JUDGE_WORKER || 'inline') !== 'off') {

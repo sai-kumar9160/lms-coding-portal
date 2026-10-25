@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findAll, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
 
 // Local upstream for the proxy: echoes what it received, stalls on /stall before replying,
@@ -30,8 +31,7 @@ process.env.PROXY_TARGETS = JSON.stringify({
     echo: { url: upstreamUrl, roles: ['TEACHER'], apiKeyHeader: 'x-api-key', apiKeyEnv: 'TEST_ECHO_KEY' },
     slow: { url: upstreamUrl, roles: ['TEACHER'], timeoutMs: 200 },
 });
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 const origin = 'http://localhost:5173';
 
 test('database menus, permissions, CORS, request IDs and proxy', async () => {
@@ -51,7 +51,7 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
     }
     async function login(email, college) { const r = await request('/auth/login', '', 'POST', { email, college, password: 'DemoPass123!' }); assert.equal(r.status, 200); return r.data.token; }
     const teacherRoleId = 3;
-    const original = await db.roleMenuPermission.findMany({ where: { roleId: teacherRoleId } });
+    const original = await findAll('roleMenuPermission', { roleId: teacherRoleId });
     const started = new Date();
     let collegeId;
     try {
@@ -71,11 +71,11 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
         const codes = items => items.map(item => item.code);
         assert.deepEqual(codes((await request('/menu', student)).data.menu), ['overview', 'courses', 'assessments', 'coding']);
         assert.deepEqual(codes((await request('/menu', teacher)).data.menu), ['overview', 'courses', 'assessments', 'coding', 'people']);
-        assert.deepEqual(codes((await request('/menu', admin)).data.menu), ['overview', 'courses', 'assessments', 'coding', 'people', 'academics', 'audit-log']);
+        assert.deepEqual(codes((await request('/menu', admin)).data.menu), ['overview', 'courses', 'assessments', 'coding', 'people', 'academics']);
         const superMenu = (await request('/menu', superToken)).data;
-        assert.deepEqual(codes(superMenu.menu), ['overview', 'courses', 'assessments', 'coding', 'people', 'academics', 'audit-log', 'platform']);
-        assert.deepEqual(codes(superMenu.menu[7].children), ['colleges', 'access-control']);
-        assert.equal(superMenu.menu[7].header, true);
+        assert.deepEqual(codes(superMenu.menu), ['overview', 'courses', 'assessments', 'people', 'academics', 'audit-log', 'platform']);
+        assert.deepEqual(codes(superMenu.menu[6].children), ['colleges', 'coding-problems', 'access-control']);
+        assert.equal(superMenu.menu[6].header, true);
         const studentAccess = (await request('/menu', student)).data.permissions;
         assert.deepEqual(studentAccess.enrollments, { view: true, create: false, update: true, delete: false, export: false }, 'Hidden permission objects are still returned');
         assert.equal(studentAccess.courses.update, false);
@@ -85,7 +85,7 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
         assert.equal((await request('/access/roles', admin)).status, 403);
         assert.equal((await request(`/access/roles/${teacherRoleId}/permissions`, teacher)).status, 403);
         const roles = await request('/access/roles', superToken);
-        assert.deepEqual(roles.data.map(role => role.code), ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'TEACHER', 'STUDENT']);
+        assert.deepEqual(roles.data.map(role => role.code), ['SUPER_ADMIN', 'COLLEGE_ADMIN', 'TEACHER', 'STUDENT', 'VENDOR']);
         const matrix = (await request(`/access/roles/${teacherRoleId}/permissions`, superToken)).data;
         const people = matrix.find(row => row.code === 'people');
         assert.equal(people.view, true);
@@ -96,7 +96,7 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
         assert.equal((await request(`/access/roles/${teacherRoleId}/permissions`, superToken, 'PUT', { permissions: [{ menuItemId: people.menuItemId, view: false, create: false, update: false, delete: false, export: false }] })).status, 200);
         assert.equal((await request('/users', teacher)).status, 403);
         assert.ok(!codes((await request('/menu', teacher)).data.menu).includes('people'));
-        const saved = await db.roleMenuPermission.findFirstOrThrow({ where: { roleId: teacherRoleId, menuItemId: people.menuItemId } });
+        const saved = await findOne('roleMenuPermission', { roleId: teacherRoleId, menuItemId: people.menuItemId });
         assert.equal(saved.canView, 0);
         assert.ok(saved.updatedBy, 'Permission changes record the updater');
         assert.equal((await request(`/access/roles/${teacherRoleId}/permissions`, superToken, 'PUT', { permissions: [{ menuItemId: people.menuItemId, view: true, create: false, update: false, delete: false, export: false }] })).status, 200);
@@ -116,7 +116,7 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
         const asSuper = (path, method = 'GET', body) => request(path, superToken, method, body, { 'x-college-id': collegeId });
         const superCourse = await asSuper('/courses', 'POST', { ...newCourse, title: 'Platform course' });
         assert.equal(superCourse.status, 201);
-        assert.equal((await db.course.findUniqueOrThrow({ where: { id: superCourse.data.id } })).collegeId, collegeId);
+        assert.equal((await findOne('course', { id: superCourse.data.id })).collegeId, collegeId);
         assert.deepEqual((await asSuper('/courses')).data.filter(c => c.collegeId === collegeId).map(c => c.title).sort(), ['Admin course', 'Platform course']);
         assert.equal((await asSuper(`/courses/${superCourse.data.id}`, 'PATCH', { status: 'PUBLISHED' })).status, 200);
         assert.ok(Number.isInteger(collegeId) && collegeId > 0, 'College IDs are positive integers');
@@ -137,7 +137,7 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
         assert.equal((await asSuper(`/users/${adminId}`, 'DELETE')).status, 404, 'College Admin accounts are not deactivated from People');
 
         // Other roles cannot switch: their header is ignored and they stay in their own college.
-        const otherCollege = await db.college.findFirst({ where: { id: { not: collegeId }, activeIndicator: 1 } });
+        const otherCollege = await db.one('SELECT id FROM "College" WHERE id <> $1 AND a_in = 1 LIMIT 1', [collegeId]);
         if (otherCollege) {
             const adminView = await request('/courses', admin, 'GET', undefined, { 'x-college-id': otherCollege.id });
             assert.equal(adminView.status, 200);
@@ -190,20 +190,19 @@ test('database menus, permissions, CORS, request IDs and proxy', async () => {
     finally {
         // Restore the teacher permissions exactly as they were.
         for (const row of original)
-            await db.roleMenuPermission.update({ where: { id: row.id }, data: { canView: row.canView, canCreate: row.canCreate, canUpdate: row.canUpdate, canDelete: row.canDelete, canExport: row.canExport, activeIndicator: row.activeIndicator } });
+            await change('roleMenuPermission', { id: row.id }, { canView: row.canView, canCreate: row.canCreate, canUpdate: row.canUpdate, canDelete: row.canDelete, canExport: row.canExport, activeIndicator: row.activeIndicator });
         // Remove only this test's sessions, not demo users' real browser sessions.
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
+        await remove('session', { sid: sids });
         if (collegeId) {
-            await db.course.deleteMany({ where: { collegeId } });
-            await db.user.deleteMany({ where: { collegeId } });
-            await db.auditLog.deleteMany({ where: { collegeId } });
-            await db.auditLog.deleteMany({ where: { entityType: 'role_permissions', occurredAt: { gte: started } } });
-            await db.college.deleteMany({ where: { id: collegeId } });
+            await remove('course', { collegeId });
+            await remove('user', { collegeId });
+            await remove('auditLog', { collegeId });
+            await db.run(`DELETE FROM adt_log_dtl_t WHERE entity_type_cd = 'role_permissions' AND occurred_ts >= $1`, [started]);
+            await remove('college', { id: collegeId });
         }
         await new Promise(resolve => server.close(() => resolve()));
         await new Promise(resolve => upstream.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

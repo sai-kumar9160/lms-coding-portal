@@ -2,10 +2,10 @@ import 'dotenv/config';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 
 test('academic structure, profiles, cohorts and the audit log', async () => {
     const server = app.listen(0, '127.0.0.1');
@@ -95,21 +95,23 @@ test('academic structure, profiles, cohorts and the audit log', async () => {
         assert.equal((await A(`cohorts/${cohort.id}`, 'PATCH', { name: 'Section A', batchId: batch.id, archived: true })).status, 200);
         assert.equal((await A(`cohorts/${cohort.id}/members`, 'POST', { userIds: [id('student2@acad.local')] })).status, 409, 'Archived cohorts are frozen');
 
-        // Audit log: before/after recorded, no secrets, scoped by college.
-        const log = (await request('/audit-logs?entityType=department', admin)).data;
+        // Audit log: before/after recorded, no secrets, scoped by college. College Admins no longer have the audit-log menu,
+        // so the Super Admin reads it with the college chosen.
+        const audits = path => request(path, superToken, 'GET', undefined, { 'x-college-id': String(created[0]) });
+        const log = (await audits('/audit-logs?entityType=department')).data;
         const update = log.items.find(item => item.action === 'update');
         assert.equal(update.before.name, 'Computer Science');
         assert.equal(update.after.name, 'Computer Science & Engineering');
         assert.equal(update.actor.email, 'admin@acad.local');
         assert.ok(update.ipAddress && update.requestId);
-        const userCreate = (await request('/audit-logs?entityType=user&action=create', admin)).data.items[0];
+        const userCreate = (await audits('/audit-logs?entityType=user&action=create')).data.items[0];
         assert.equal(userCreate.after.password, undefined, 'Passwords are never written to the audit log');
         assert.ok(userCreate.after.email);
-        assert.ok((await request('/audit-logs', admin)).data.items.every(item => item.collegeId === created[0]), 'College Admins see their college only');
+        assert.ok((await audits('/audit-logs')).data.items.every(item => item.collegeId === created[0]), 'College Admins see their college only');
         assert.equal((await request('/audit-logs', teacher)).status, 403);
-        const paged = await request('/audit-logs?limit=2', admin);
+        const paged = await audits('/audit-logs?limit=2');
         assert.equal(paged.data.items.length, 2);
-        const next = await request(`/audit-logs?limit=2&cursor=${paged.data.nextCursor}`, admin);
+        const next = await audits(`/audit-logs?limit=2&cursor=${paged.data.nextCursor}`);
         assert.ok(next.data.items.every(item => !paged.data.items.some(p => p.id === item.id)), 'Cursor pages do not repeat');
         const superView = await request(`/audit-logs?entityType=department`, superToken, 'GET', undefined, { 'x-college-id': created[1] });
         assert.ok(superView.data.items.length && superView.data.items.every(item => item.collegeId === created[1]), 'Super Admin filters by the chosen college');
@@ -119,19 +121,18 @@ test('academic structure, profiles, cohorts and the audit log', async () => {
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
-        await db.cohort.deleteMany({ where: { collegeId: { in: created } } });
-        await db.studentProfile.deleteMany({ where: { collegeId: { in: created } } });
-        await db.teacherProfile.deleteMany({ where: { collegeId: { in: created } } });
-        await db.batch.deleteMany({ where: { collegeId: { in: created } } });
-        await db.program.deleteMany({ where: { collegeId: { in: created } } });
-        await db.department.deleteMany({ where: { collegeId: { in: created } } });
-        await db.academicYear.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
+        await remove('session', { sid: sids });
+        await remove('cohort', { collegeId: created });
+        await remove('studentProfile', { collegeId: created });
+        await remove('teacherProfile', { collegeId: created });
+        await remove('batch', { collegeId: created });
+        await remove('program', { collegeId: created });
+        await remove('department', { collegeId: created });
+        await remove('academicYear', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('college', { id: created });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

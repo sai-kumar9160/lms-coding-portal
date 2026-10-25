@@ -15,5 +15,5 @@ async function check(directory) {
     }
   }
 }
-for (const folder of ['src', 'config', 'prisma', 'scripts']) await check(path.join(server, folder));
+for (const folder of ['src', 'config', 'scripts']) await check(path.join(server, folder));
 console.log('Server JavaScript syntax checks passed.');

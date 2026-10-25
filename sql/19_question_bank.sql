@@ -5,9 +5,9 @@
 BEGIN;
 
 CREATE TABLE public.qstn_lst_t (
-    qstn_id text NOT NULL,
-    college_id text NOT NULL,
-    course_id text,
+    qstn_id integer NOT NULL,
+    college_id integer NOT NULL,
+    course_id integer,
     qstn_type_cd public."QuestionType" NOT NULL,
     stem_tx text NOT NULL,
     explanation_tx text DEFAULT ''::text NOT NULL,
@@ -18,24 +18,48 @@ CREATE TABLE public.qstn_lst_t (
     topic_tx text DEFAULT ''::text NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
-    cdng_prblm_id text,
+    cdng_prblm_id integer,
     CONSTRAINT qstn_lst_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1]))),
     CONSTRAINT qstn_lst_t_marks_check CHECK (((marks_ct > (0)::double precision) AND (negative_marks_ct >= (0)::double precision)))
 );
 
+CREATE SEQUENCE public.qstn_lst_t_qstn_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.qstn_lst_t_qstn_id_seq OWNED BY public.qstn_lst_t.qstn_id;
+
 CREATE TABLE public.qstn_optn_lst_t (
-    qstn_optn_id text NOT NULL,
-    qstn_id text NOT NULL,
+    qstn_optn_id integer NOT NULL,
+    qstn_id integer NOT NULL,
     optn_tx text NOT NULL,
     is_correct_in smallint DEFAULT 0 NOT NULL,
     sqnce_id integer DEFAULT 0 NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT qstn_optn_lst_t_correct_check CHECK ((is_correct_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.qstn_optn_lst_t_qstn_optn_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.qstn_optn_lst_t_qstn_optn_id_seq OWNED BY public.qstn_optn_lst_t.qstn_optn_id;
+
+ALTER TABLE ONLY public.qstn_lst_t ALTER COLUMN qstn_id SET DEFAULT nextval('public.qstn_lst_t_qstn_id_seq'::regclass);
+
+ALTER TABLE ONLY public.qstn_optn_lst_t ALTER COLUMN qstn_optn_id SET DEFAULT nextval('public.qstn_optn_lst_t_qstn_optn_id_seq'::regclass);
 
 ALTER TABLE ONLY public.qstn_lst_t
     ADD CONSTRAINT qstn_lst_t_pkey PRIMARY KEY (qstn_id);

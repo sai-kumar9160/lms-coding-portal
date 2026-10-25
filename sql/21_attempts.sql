@@ -5,24 +5,34 @@
 BEGIN;
 
 CREATE TABLE public.atmpt_ans_dtl_t (
-    atmpt_ans_id text NOT NULL,
-    atmpt_id text NOT NULL,
-    qstn_id text NOT NULL,
+    atmpt_ans_id integer NOT NULL,
+    atmpt_id integer NOT NULL,
+    qstn_id integer NOT NULL,
     answer_json jsonb,
     is_correct_in smallint,
     marks_awarded_ct double precision,
     feedback_tx text DEFAULT ''::text NOT NULL,
-    evaluated_by text,
+    evaluated_by integer,
     evaluated_ts timestamp(3) without time zone,
     saved_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
+CREATE SEQUENCE public.atmpt_ans_dtl_t_atmpt_ans_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.atmpt_ans_dtl_t_atmpt_ans_id_seq OWNED BY public.atmpt_ans_dtl_t.atmpt_ans_id;
+
 CREATE TABLE public.atmpt_dtl_t (
-    atmpt_id text NOT NULL,
-    college_id text NOT NULL,
-    asmt_id text NOT NULL,
-    asmt_wndw_id text NOT NULL,
-    user_id text NOT NULL,
+    atmpt_id integer NOT NULL,
+    college_id integer NOT NULL,
+    asmt_id integer NOT NULL,
+    asmt_wndw_id integer NOT NULL,
+    user_id integer NOT NULL,
     atmpt_no integer NOT NULL,
     status_cd public."AttemptStatus" DEFAULT 'IN_PROGRESS'::public."AttemptStatus" NOT NULL,
     started_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -37,6 +47,20 @@ CREATE TABLE public.atmpt_dtl_t (
     u_ts timestamp(3) without time zone,
     CONSTRAINT atmpt_dtl_t_flags_check CHECK (((needs_grading_in = ANY (ARRAY[0, 1])) AND ((is_passed_in IS NULL) OR (is_passed_in = ANY (ARRAY[0, 1])))))
 );
+
+CREATE SEQUENCE public.atmpt_dtl_t_atmpt_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.atmpt_dtl_t_atmpt_id_seq OWNED BY public.atmpt_dtl_t.atmpt_id;
+
+ALTER TABLE ONLY public.atmpt_ans_dtl_t ALTER COLUMN atmpt_ans_id SET DEFAULT nextval('public.atmpt_ans_dtl_t_atmpt_ans_id_seq'::regclass);
+
+ALTER TABLE ONLY public.atmpt_dtl_t ALTER COLUMN atmpt_id SET DEFAULT nextval('public.atmpt_dtl_t_atmpt_id_seq'::regclass);
 
 ALTER TABLE ONLY public.atmpt_ans_dtl_t
     ADD CONSTRAINT atmpt_ans_dtl_t_pkey PRIMARY KEY (atmpt_ans_id);

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Role } from '@prisma/client';
+import { Role } from '../src/utils/enums.js';
 
 // Express "trust proxy": only set when a reverse proxy (nginx, load balancer) terminates HTTPS.
 // TRUST_PROXY accepts a hop count (1), 'loopback', 'uniquelocal', or comma-separated proxy IPs/subnets.

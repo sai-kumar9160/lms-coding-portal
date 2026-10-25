@@ -5,20 +5,32 @@
 BEGIN;
 
 CREATE TABLE public.pwd_rst_tkn_dtl_t (
-    rst_tkn_id text NOT NULL,
-    user_id text NOT NULL,
+    rst_tkn_id integer NOT NULL,
+    user_id integer NOT NULL,
     tkn_hash_tx text NOT NULL,
     expires_ts timestamp(3) without time zone NOT NULL,
     used_ts timestamp(3) without time zone,
     rqst_ip_tx text,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT pwd_rst_tkn_dtl_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.pwd_rst_tkn_dtl_t_rst_tkn_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.pwd_rst_tkn_dtl_t_rst_tkn_id_seq OWNED BY public.pwd_rst_tkn_dtl_t.rst_tkn_id;
+
+ALTER TABLE ONLY public.pwd_rst_tkn_dtl_t ALTER COLUMN rst_tkn_id SET DEFAULT nextval('public.pwd_rst_tkn_dtl_t_rst_tkn_id_seq'::regclass);
 
 ALTER TABLE ONLY public.pwd_rst_tkn_dtl_t
     ADD CONSTRAINT pwd_rst_tkn_dtl_t_pkey PRIMARY KEY (rst_tkn_id);

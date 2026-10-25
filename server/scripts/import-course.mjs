@@ -1,6 +1,6 @@
 // Imports a course syllabus (JSON) into the database for one college.
 // Usage (from E:\LMS\server):
-//   npm run course:import -- --file prisma/data/courses/python-basics-to-oop.json --college srk123 --owner teacher@college.edu [--notes "C:\path\notes.pdf"] [--publish]
+//   npm run course:import -- --file data/courses/python-basics-to-oop.json --college srk123 --owner teacher@college.edu [--notes "C:\path\notes.pdf"] [--publish]
 // The owner must be an active teacher or College Admin of that college. A course with the same code is never overwritten.
 import 'dotenv/config';
 import fs from 'node:fs';
@@ -9,7 +9,9 @@ import { randomUUID } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { z } from 'zod';
 import { db } from '../config/db.config.js';
-import { fileModel } from '../src/models/file.model.js';
+import { writeAuditLog } from './lib/audit-log.mjs';
+import { findCollege } from './lib/course-lookup.mjs';
+import { fileMdl } from '../src/modules/file/models/fileMdl.js';
 import { tmpDir } from '../src/services/file-storage.service.js';
 import { attachChapterPdfs } from './lib/chapter-pdfs.mjs';
 
@@ -33,11 +35,13 @@ if (!args.file || !args.college || !args.owner)
 
 try {
     const data = courseFile.parse(JSON.parse(fs.readFileSync(path.resolve(args.file), 'utf8')));
-    const college = await db.college.findFirst({ where: { slug: args.college, activeIndicator: 1 } });
+    const college = await findCollege(args.college);
     if (!college) stop(`College "${args.college}" not found`);
-    const owner = await db.user.findFirst({ where: { email: args.owner.toLowerCase(), collegeId: college.id, role: { in: ['TEACHER', 'COLLEGE_ADMIN'] }, status: 'ACTIVE', activeIndicator: 1 } });
+    const owner = await db.one(`SELECT u.id, u.name, u.email, u.mobile_no AS "mobileNo", u.password, u.role, u.role_id AS "roleId", u.status,
+            u."collegeId", u.i_ts AS "createdAt", u.u_ts AS "updatedAt", u.crte_usr_id AS "createdBy",
+            u.updte_usr_id AS "updatedBy", u.a_in AS "activeIndicator", u.d_ts AS "deletedAt" FROM "User" u WHERE u.email = $1 AND u."collegeId" = $2 AND u.role IN ('TEACHER', 'COLLEGE_ADMIN') AND u.status = 'ACTIVE' AND u.a_in = 1`, [args.owner.toLowerCase(), college.id]);
     if (!owner) stop(`No active teacher or College Admin "${args.owner}" in ${college.name}`);
-    if (await db.course.findFirst({ where: { collegeId: college.id, code: data.code } }))
+    if (await db.one('SELECT 1 FROM "Course" WHERE "collegeId" = $1 AND course_cd = $2', [college.id, data.code]))
         stop(`${college.name} already has a course with code ${data.code}; it was not changed.`);
 
     // The notes PDF is stored like a normal upload (type check, checksum, college folder) and linked as the course syllabus.
@@ -46,24 +50,40 @@ try {
         const source = path.resolve(args.notes);
         const copy = path.join(tmpDir, randomUUID());
         fs.copyFileSync(source, copy);
-        syllabusFileId = (await fileModel.store({ id: owner.id }, college.id, 'DOCUMENT', { path: copy, originalname: path.basename(source), size: fs.statSync(source).size })).id;
+        syllabusFileId = (await fileMdl.store({ id: owner.id }, college.id, 'DOCUMENT', { path: copy, originalname: path.basename(source), size: fs.statSync(source).size })).id;
     }
 
-    const audit = { collegeId: college.id, createdBy: owner.id };
-    const course = await db.course.create({ data: {
-        title: data.title, description: data.description, code: data.code, level: data.level, durationHours: data.durationHours,
-        objectives: data.objectives, outcomes: data.outcomes, syllabusFileId, status: args.publish ? 'PUBLISHED' : 'DRAFT', teacherId: owner.id, ...audit,
-        instructors: { create: { userId: owner.id, role: 'OWNER', ...audit } },
-        modules: { create: data.modules.map((module, m) => ({ title: module.title, description: module.description, position: m, ...audit,
-            lessons: { create: module.lessons.map(({ pages, ...item }, l) => ({ ...item, position: l, ...audit })) } })) },
-    }, include: { modules: { include: { lessons: true } } } });
+    const created = await db.transaction(async tx => {
+        const course = await tx.one(
+            `INSERT INTO "Course" (id, "collegeId", title, description, course_cd, level_cd, duration_hrs_ct, objectives_tx, outcomes_tx, syllabus_file_id, status, "teacherId", crte_usr_id)
+             VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11) RETURNING id`,
+            [college.id, data.title, data.description, data.code, data.level ?? null, data.durationHours ?? null, data.objectives, data.outcomes, syllabusFileId,
+                args.publish ? 'PUBLISHED' : 'DRAFT', owner.id]);
+        await tx.run(
+            `INSERT INTO crse_instrctr_rel_t (crse_instrctr_id, college_id, course_id, user_id, instrctr_role_cd, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, 'OWNER', $3)`,
+            [college.id, course.id, owner.id]);
+        const modules = [];
+        for (const [m, module] of data.modules.entries()) {
+            const row = await tx.one(
+                `INSERT INTO "CourseModule" (id, "collegeId", "courseId", title, module_dscn_tx, position, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, $4, $5, $6) RETURNING id`,
+                [college.id, course.id, module.title, module.description, m, owner.id]);
+            const lessons = [];
+            for (const [l, { pages, ...item }] of module.lessons.entries())
+                lessons.push(await tx.one(
+                    `INSERT INTO "Lesson" (id, "collegeId", "moduleId", title, content, position, crte_usr_id) VALUES (DEFAULT, $1, $2, $3, $4, $5, $6) RETURNING id, title`,
+                    [college.id, row.id, item.title, item.content, l, owner.id]));
+            modules.push({ ...row, lessons });
+        }
+        return { ...course, modules };
+    });
+    const course = created;
     let chapters = 0;
     if (args.notes) {
         const pagesByTitle = new Map(data.modules.flatMap(m => m.lessons).filter(l => l.pages).map(l => [l.title, l.pages]));
         const lessonsWithPages = course.modules.flatMap(m => m.lessons).filter(l => pagesByTitle.has(l.title)).map(l => ({ id: l.id, title: l.title, pages: pagesByTitle.get(l.title) }));
         chapters = await attachChapterPdfs({ ownerId: owner.id, collegeId: college.id, notesPath: path.resolve(args.notes), lessons: lessonsWithPages });
     }
-    await db.auditLog.create({ data: { collegeId: college.id, actorId: owner.id, action: 'import', entityType: 'course', entityId: course.id, after: { code: data.code, title: data.title, source: path.basename(args.file), units: data.modules.length } } });
+    await writeAuditLog({ collegeId: college.id, actorId: owner.id, action: 'import', entityType: 'course', entityId: course.id, after: { code: data.code, title: data.title, source: path.basename(args.file), units: data.modules.length } });
     const lessons = data.modules.reduce((sum, module) => sum + module.lessons.length, 0);
     console.log(`Imported ${data.code} "${data.title}" into ${college.name}: ${data.modules.length} units, ${lessons} lessons, ${syllabusFileId ? 'syllabus PDF linked, ' : ''}${chapters ? `${chapters} chapter PDFs, ` : ''}status ${args.publish ? 'PUBLISHED' : 'DRAFT'}.`);
 }
@@ -71,5 +91,5 @@ catch (error) {
     stop(error instanceof z.ZodError ? `Invalid course file: ${error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}` : error.message);
 }
 finally {
-    await db.$disconnect();
+    await db.end();
 }

@@ -5,34 +5,58 @@
 BEGIN;
 
 CREATE TABLE public.chrt_lst_t (
-    chrt_id text NOT NULL,
-    college_id text NOT NULL,
+    chrt_id integer NOT NULL,
+    college_id integer NOT NULL,
     chrt_nm text NOT NULL,
     chrt_dscn_tx text DEFAULT ''::text NOT NULL,
-    btch_id text,
+    btch_id integer,
     archived_in smallint DEFAULT 0 NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT chrt_lst_t_flags_check CHECK (((archived_in = ANY (ARRAY[0, 1])) AND (a_in = ANY (ARRAY[0, 1]))))
 );
 
+CREATE SEQUENCE public.chrt_lst_t_chrt_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.chrt_lst_t_chrt_id_seq OWNED BY public.chrt_lst_t.chrt_id;
+
 CREATE TABLE public.chrt_mbr_rel_t (
-    chrt_mbr_id text NOT NULL,
-    college_id text NOT NULL,
-    chrt_id text NOT NULL,
-    user_id text NOT NULL,
+    chrt_mbr_id integer NOT NULL,
+    college_id integer NOT NULL,
+    chrt_id integer NOT NULL,
+    user_id integer NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT chrt_mbr_rel_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.chrt_mbr_rel_t_chrt_mbr_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.chrt_mbr_rel_t_chrt_mbr_id_seq OWNED BY public.chrt_mbr_rel_t.chrt_mbr_id;
+
+ALTER TABLE ONLY public.chrt_lst_t ALTER COLUMN chrt_id SET DEFAULT nextval('public.chrt_lst_t_chrt_id_seq'::regclass);
+
+ALTER TABLE ONLY public.chrt_mbr_rel_t ALTER COLUMN chrt_mbr_id SET DEFAULT nextval('public.chrt_mbr_rel_t_chrt_mbr_id_seq'::regclass);
 
 ALTER TABLE ONLY public.chrt_lst_t
     ADD CONSTRAINT chrt_lst_t_pkey PRIMARY KEY (chrt_id);

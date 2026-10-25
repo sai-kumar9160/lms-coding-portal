@@ -5,9 +5,9 @@
 BEGIN;
 
 CREATE TABLE public.adt_log_dtl_t (
-    adt_log_id text NOT NULL,
-    college_id text,
-    actor_usr_id text,
+    adt_log_id integer NOT NULL,
+    college_id integer,
+    actor_usr_id integer,
     acting_as_sa_in smallint DEFAULT 0 NOT NULL,
     action_cd text NOT NULL,
     entity_type_cd text NOT NULL,
@@ -20,6 +20,18 @@ CREATE TABLE public.adt_log_dtl_t (
     occurred_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT adt_log_dtl_t_flags_check CHECK ((acting_as_sa_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.adt_log_dtl_t_adt_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.adt_log_dtl_t_adt_log_id_seq OWNED BY public.adt_log_dtl_t.adt_log_id;
+
+ALTER TABLE ONLY public.adt_log_dtl_t ALTER COLUMN adt_log_id SET DEFAULT nextval('public.adt_log_dtl_t_adt_log_id_seq'::regclass);
 
 ALTER TABLE ONLY public.adt_log_dtl_t
     ADD CONSTRAINT adt_log_dtl_t_pkey PRIMARY KEY (adt_log_id);

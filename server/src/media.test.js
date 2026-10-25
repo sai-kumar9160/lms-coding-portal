@@ -5,14 +5,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
 // Uploads go to a throwaway folder; a 1 MB document limit lets the test hit the size check cheaply.
 const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lms-uploads-'));
 process.env.UPLOAD_DIR = uploadDir;
 process.env.UPLOAD_MAX_DOCUMENT_MB = '1';
-const { app, db: appDb } = await import('./index.js');
-const db = createDatabaseClient();
+const { app } = await import('./index.js');
 
 const pdf = Buffer.from('%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n');
 const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(200, 7)]);
@@ -77,7 +77,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         assert.equal((await upload(teacher, 'VIDEO', pdf, 'notes.mp4', 'video/mp4')).status, 415, 'A PDF cannot be uploaded as a video');
         assert.equal((await upload(teacher, 'DOCUMENT', Buffer.concat([pdf, Buffer.alloc(1100000)]), 'big.pdf', 'application/pdf')).status, 413);
         assert.equal((await upload(student, 'DOCUMENT', pdf, 'x.pdf', 'application/pdf')).status, 403);
-        const stored = await db.fileUpload.findUniqueOrThrow({ where: { id: doc.data.id } });
+        const stored = await findOne('fileUpload', { id: doc.data.id });
         assert.ok(stored.storageKey.startsWith(`colleges/${created[0]}/`));
         assert.ok(fs.existsSync(path.join(uploadDir, stored.storageKey)));
         assert.equal(stored.checksum.length, 64);
@@ -89,7 +89,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         const course = await request('/courses', teacher, 'POST', { title: 'Media course', description: 'Videos and documents', moduleTitle: 'Week 1', lessonTitle: 'Welcome', content: 'Welcome to the media course.' });
         assert.equal(course.status, 201);
         const coursePath = `/courses/${course.data.id}`;
-        const moduleId = (await db.courseModule.findFirstOrThrow({ where: { courseId: course.data.id } })).id;
+        const moduleId = (await findOne('courseModule', { courseId: course.data.id })).id;
         const lessonsPath = `${coursePath}/modules/${moduleId}/lessons`;
         assert.equal((await request(lessonsPath, teacher, 'POST', { title: 'Wrong file', lessonType: 'VIDEO', fileId: doc.data.id })).status, 400, 'Video lessons need a video file');
         assert.equal((await request(lessonsPath, teacher, 'POST', { title: 'Other college', lessonType: 'DOCUMENT', fileId: fileB.data.id })).status, 400, 'Files from another college cannot be attached');
@@ -136,7 +136,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         assert.equal((await media('', doc.data.id)).status, 401, 'No session cookie, no file');
         assert.equal((await media(student, doc.data.id, {}, '?download=1')).status, 403, 'Download not allowed for this lesson');
         assert.equal((await media(student2, doc.data.id)).status, 200, 'Every student of the college can open it');
-        assert.equal(await db.enrollment.count({ where: { courseId: course.data.id } }), 0, 'Opening content creates no progress record');
+        assert.equal(await countRows('enrollment', { courseId: course.data.id }), 0, 'Opening content creates no progress record');
         assert.equal((await media(studentB, doc.data.id)).status, 404, 'Other colleges cannot open the file');
         assert.equal((await media(adminB, doc.data.id)).status, 404);
         assert.equal((await media(adminA, video.data.id)).status, 200);
@@ -149,7 +149,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         const welcomeId = visible.modules[0].lessons[0].id;
         assert.equal((await request(`/lessons/${welcomeId}/complete`, student, 'POST')).status, 200);
         assert.equal((await request(`/lessons/${docLesson.data.id}/complete`, student, 'POST')).status, 200);
-        const enrollment = () => db.enrollment.findFirstOrThrow({ where: { courseId: course.data.id, userId: studentId } });
+        const enrollment = () => findOne('enrollment', { courseId: course.data.id, userId: studentId });
         assert.equal((await enrollment()).progressPct, 66);
         const range = await media(student, video.data.id, { Range: 'bytes=0-9' });
         assert.equal(range.status, 206, 'Videos support range requests for seeking');
@@ -159,7 +159,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         assert.equal(saved.status, 200);
         assert.equal((await request(`/lessons/${videoLesson.data.id}/progress`, student, 'POST', { positionSec: 500, spentSec: 30 })).data.lastPositionSec, 60, 'Position is capped at the video duration');
         assert.equal((await request(`/lessons/${videoLesson.data.id}/progress`, student, 'POST', { positionSec: 5, spentSec: 500 })).status, 400, 'Watch time per save is limited');
-        const watched = await db.lessonProgress.findFirstOrThrow({ where: { lessonId: videoLesson.data.id, userId: studentId } });
+        const watched = await findOne('lessonProgress', { lessonId: videoLesson.data.id, userId: studentId });
         assert.equal(watched.timeSpentSec, 60);
         assert.equal(watched.completedAt, null, 'Watching does not complete the lesson');
         assert.equal((await request(`/lessons/${videoLesson.data.id}/complete`, student, 'POST')).status, 200);
@@ -179,7 +179,7 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
         // Syllabus details, the linked syllabus PDF, and the generated syllabus PDF.
         const syllabusPdf = await upload(teacher, 'DOCUMENT', pdf, 'Media syllabus.pdf', 'application/pdf');
         assert.equal((await request(coursePath, teacher, 'PATCH', { code: 'med-101', level: 'BEGINNER', durationHours: 20, objectives: 'Watch videos\nRead PDFs', outcomes: 'Use media lessons', syllabusFileId: syllabusPdf.data.id })).status, 200);
-        assert.equal((await db.course.findUniqueOrThrow({ where: { id: course.data.id } })).code, 'MED-101', 'Codes are upper-cased');
+        assert.equal((await findOne('course', { id: course.data.id })).code, 'MED-101', 'Codes are upper-cased');
         assert.equal((await request(coursePath, teacher, 'PATCH', { syllabusFileId: video.data.id })).status, 400, 'The syllabus must be a PDF');
         assert.equal((await request(coursePath, teacher, 'PATCH', { syllabusFileId: fileB.data.id })).status, 400, 'The syllabus must belong to this college');
         assert.equal((await request('/courses', teacher, 'POST', { title: 'Second course', description: 'Same code again', moduleTitle: 'M1', lessonTitle: 'L1', content: 'Duplicate code test.', code: 'MED-101' })).status, 409, 'Course codes are unique in a college');
@@ -203,17 +203,16 @@ test('lesson uploads, protected media, prerequisites, progress, instructors and 
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
-        await db.lessonProgress.deleteMany({ where: { collegeId: { in: created } } });
-        await db.enrollment.deleteMany({ where: { collegeId: { in: created } } });
-        await db.course.deleteMany({ where: { collegeId: { in: created } } });
-        await db.fileUpload.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
+        await remove('session', { sid: sids });
+        await remove('lessonProgress', { collegeId: created });
+        await remove('enrollment', { collegeId: created });
+        await remove('course', { collegeId: created });
+        await remove('fileUpload', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('college', { id: created });
         fs.rmSync(uploadDir, { recursive: true, force: true });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

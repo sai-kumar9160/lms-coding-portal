@@ -39,46 +39,25 @@ Run the files in numeric order on an **empty** database. A foreign key that poin
 
 Each file runs in its own transaction.
 
-## Where these files come from
+## How the database is built
 
-- **Prisma migrations** (`server/prisma/migrations`) are the history Prisma applies with `npm run db:setup`. They are never edited after being applied: Prisma checksums them, and an edited migration stops `prisma migrate deploy` working on existing databases.
-- **These files** are generated from a fully migrated database by `server/scripts/export-sql.mjs` (`pg_dump`, split per table). After adding a migration and applying it, regenerate them from `E:\LMS`:
-
-  ```powershell
-  npm run db:export
-  ```
-
-  The script needs `pg_dump`: from `C:\Program Files\PostgreSQL\18\bin`, from PATH, or from the folder in `PG_BIN`. When a migration adds a table, add the table to `GROUPS` in the script; it stops and names any table that is missing.
-
-## Recommended: Prisma-managed setup
-
-From `E:\LMS`, with `server/.env` configured:
+These files **are** the schema. `npm run db:setup` (from the repository root) runs them in numeric order when the database is empty, then loads the demo data (`server/scripts/seed.mjs`) and the coding problem library (`server/scripts/import-problems.mjs`). Running it again on an existing database only refreshes the demo data.
 
 ```powershell
-npm run db:generate -w server
 npm run db:setup
 ```
 
-`db:setup` applies the migrations, seeds the demo accounts and imports the coding problems. Do not also run these SQL files on the same database.
+To change the schema, edit the file of the table you are changing, or add a new numbered file for a new table, and update the SQL in the matching model under `server/src/modules/`. For an existing database, apply the same change by hand with `psql`.
 
-## Alternative: build a new database from these files
+Instead of `db:setup` you can run the files yourself:
 
 ```powershell
 $bin = 'C:\Program Files\PostgreSQL\18\bin'
-& "$bin\createdb.exe" -h localhost -p 5432 -U postgres lms_new
 Get-ChildItem sql\*.sql | Sort-Object Name | ForEach-Object {
     & "$bin\psql.exe" -h localhost -p 5432 -U postgres -d lms_new -v ON_ERROR_STOP=1 -f $_.FullName
 }
 ```
 
-Then point `DATABASE_URL` in `server/.env` at `lms_new`. Tell Prisma the migrations are already applied, and load the demo data and coding problems:
+`npm run db:export` rewrites these files from a running database with `pg_dump` (useful after changing a table directly in pgAdmin); it needs `pg_dump` on PATH or in the folder named by `PG_BIN`.
 
-```powershell
-Set-Location server
-Get-ChildItem prisma\migrations -Directory | ForEach-Object { npx prisma migrate resolve --applied $_.Name }
-node prisma/seed.js
-npm run coding:import
-Set-Location ..
-```
-
-These files contain only the schema and reference rows: roles, menus and permissions. Colleges, users, courses and coding problems are not included.
+These files contain only the schema and reference rows: roles, menus and permissions. Colleges, users, courses and coding problems come from the seed and import scripts.

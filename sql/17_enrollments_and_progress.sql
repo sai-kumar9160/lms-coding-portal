@@ -5,14 +5,14 @@
 BEGIN;
 
 CREATE TABLE public."Enrollment" (
-    id text NOT NULL,
-    "collegeId" text NOT NULL,
-    "userId" text NOT NULL,
-    "courseId" text NOT NULL,
-    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP CONSTRAINT "Enrollment_createdAt_not_null" NOT NULL,
+    id integer NOT NULL,
+    "collegeId" integer NOT NULL,
+    "userId" integer NOT NULL,
+    "courseId" integer NOT NULL,
+    i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     completed_at timestamp(3) without time zone,
@@ -20,22 +20,46 @@ CREATE TABLE public."Enrollment" (
     CONSTRAINT "Enrollment_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
 
+CREATE SEQUENCE public."Enrollment_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."Enrollment_id_seq" OWNED BY public."Enrollment".id;
+
 CREATE TABLE public."LessonProgress" (
-    id text NOT NULL,
-    "collegeId" text NOT NULL,
-    "userId" text NOT NULL,
-    "lessonId" text NOT NULL,
+    id integer NOT NULL,
+    "collegeId" integer NOT NULL,
+    "userId" integer NOT NULL,
+    "lessonId" integer NOT NULL,
     "completedAt" timestamp(3) without time zone,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     last_position_sec integer DEFAULT 0 NOT NULL,
     time_spent_sec integer DEFAULT 0 NOT NULL,
     CONSTRAINT "LessonProgress_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public."LessonProgress_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."LessonProgress_id_seq" OWNED BY public."LessonProgress".id;
+
+ALTER TABLE ONLY public."Enrollment" ALTER COLUMN id SET DEFAULT nextval('public."Enrollment_id_seq"'::regclass);
+
+ALTER TABLE ONLY public."LessonProgress" ALTER COLUMN id SET DEFAULT nextval('public."LessonProgress_id_seq"'::regclass);
 
 ALTER TABLE ONLY public."Enrollment"
     ADD CONSTRAINT "Enrollment_pkey" PRIMARY KEY (id);

@@ -1,4 +1,4 @@
-import { accessModel, permissionActions } from '../models/access.model.js';
+import { accessMdl, permissionActions } from '../modules/access/models/accessMdl.js';
 import { fail } from '../utils/http-error.js';
 
 // requirePermission('courses', 'update') allows the request only when the user's role has that flag
@@ -7,7 +7,7 @@ export function requirePermission(code, action = 'view') {
     if (!permissionActions.includes(action))
         throw new Error(`Unknown permission action: ${action}`);
     return async (req, _res, next) => {
-        const permissions = await accessModel.permissions(req.identity.role);
+        const permissions = await accessMdl.permissions(req.identity.role);
         if (!permissions[code]?.[action])
             fail(403, 'You do not have permission');
         next();

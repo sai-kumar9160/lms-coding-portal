@@ -5,16 +5,16 @@
 BEGIN;
 
 CREATE TABLE public."User" (
-    id text NOT NULL,
+    id integer NOT NULL,
     name text NOT NULL,
     email text NOT NULL,
     password text NOT NULL,
     role public."Role" NOT NULL,
-    "collegeId" text,
+    "collegeId" integer,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     mobile_no text,
@@ -22,6 +22,18 @@ CREATE TABLE public."User" (
     status public."UserStatus" DEFAULT 'ACTIVE'::public."UserStatus" NOT NULL,
     CONSTRAINT "User_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public."User_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."User_id_seq" OWNED BY public."User".id;
+
+ALTER TABLE ONLY public."User" ALTER COLUMN id SET DEFAULT nextval('public."User_id_seq"'::regclass);
 
 ALTER TABLE ONLY public."User"
     ADD CONSTRAINT "User_pkey" PRIMARY KEY (id);

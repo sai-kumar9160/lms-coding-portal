@@ -16,7 +16,7 @@ const visibleLessons = lessons => lessons.filter(lesson => !hiddenLessonTitles.h
 export function CoursesPage() {
     const { courses, inCollege, can, college, setModal, isSuper, colleges, switchCollege, busy } = useWorkspace();
     const [params, setParams] = useSearchParams();
-    const selectedCourse = courses.find(c => c.id === params.get('course'));
+    const selectedCourse = courses.find(c => String(c.id) === params.get('course'));
     const course = selectedCourse && { ...selectedCourse, modules: selectedCourse.modules.map(module => ({ ...module, lessons: visibleLessons(module.lessons) })) };
     const lessonId = params.get('lesson');
     useEffect(() => { window.scrollTo({ top: 0 }); }, [course?.id, lessonId]);
@@ -50,7 +50,7 @@ export function CoursesPage() {
         if (lesson.lessonType === 'VIDEO') return setModal(course.id); // videos play in the lesson player
         setParams({ course: course.id, lesson: lesson.id });
     };
-    const reading = lessons.find(l => l.id === lessonId && !lockedBy(l));
+    const reading = lessons.find(l => String(l.id) === lessonId && !lockedBy(l));
     const index = reading ? lessons.indexOf(reading) : -1;
     const neighbour = (step) => { for (let i = index + step; i >= 0 && i < lessons.length; i += step) if (!lockedBy(lessons[i])) return lessons[i]; return null; };
     const showUnits = course.modules.length > 1;

@@ -1,10 +1,10 @@
 # Campus LMS
 
-React + JavaScript client and Express + JavaScript server backed by PostgreSQL and Prisma.
+React + JavaScript client and Express + JavaScript server backed by PostgreSQL, using the `pg` driver and hand-written SQL (no ORM).
 
-Development is local in `client` and `server`. The complete database schema is in the root [`sql`](sql/README.md) folder, one file per table (or group of related tables), with every command for that table. Run `npm run db:export` to regenerate it after applying a new Prisma migration.
+Development is local in `client` and `server`. The complete database schema is in the root [`sql`](sql/README.md) folder, one file per table (or group of related tables), with every command for that table. `npm run db:setup` builds an empty database from those files. Every row id is a whole number (1, 2, 3 ...) that the database counts up by itself; ids in URLs and JSON are numbers too. A database created before this change still has text (UUID) ids: convert it once with `node server/scripts/migrate-integer-ids.mjs` (it keeps all data and links, runs in one transaction, and everyone has to sign in again afterwards).
 
-Database connection configuration lives in [`server/config/db.config.js`](server/config/db.config.js). The API, session store, and seed script use this shared Prisma client; credentials come from the ignored `server/.env`. The server starts from `server/nodeapp.js` (`npm start -w server`); no TypeScript compilation is required. React source files use `.jsx`.
+Database connection configuration lives in [`server/config/db.config.js`](server/config/db.config.js). The API, session store, and seed script use this shared `pg` connection pool (`db.many`, `db.one`, `db.run`, `db.transaction`); credentials come from the ignored `server/.env`. The server starts from `server/nodeapp.js` (`npm start -w server`); no TypeScript compilation is required. React source files use `.jsx`.
 
 ## Run locally
 
@@ -15,7 +15,6 @@ npm install
 Copy-Item server/.env.example server/.env
 # Set separate random JWT_SECRET and SESSION_SECRET values (32+ characters).
 docker compose up -d postgres
-npm run db:generate -w server
 npm run db:setup
 npm run dev
 ```
@@ -53,7 +52,7 @@ If using Docker instead, set DATABASE_URL to the value in `server/.env.example`.
 
 The initial screen now offers registration first, with a Sign in tab for existing accounts. Register as Student or Teacher using an active college code (for example `alpha`), name, email, mobile number, password (10+ characters), and confirmation. Successful registration takes you to sign in; it does not automatically create a login session. Public registration cannot create College Admin or Super Admin accounts.
 
-Login and registration validation are in `server/src/controllers/auth.controller.js`; account database operations and password hashing are in `server/src/models/auth.model.js`. The required mobile number is stored as `User.mobile_no` and must be unique within a college. Existing accounts retain null until a real number is provided. Admin-created student and teacher accounts also require a mobile number. Self-registered students are active immediately; self-registered teachers wait for approval (see below). Tables: `sql/03_users.sql`.
+Login and registration validation are in `server/src/modules/auth/controllers/authCtrl.js`; account database operations and password hashing are in `server/src/modules/auth/models/authMdl.js`. The required mobile number is stored as `User.mobile_no` and must be unique within a college. Existing accounts retain null until a real number is provided. Admin-created student and teacher accounts also require a mobile number. Self-registered students are active immediately; self-registered teachers wait for approval (see below). Tables: `sql/03_users.sql`.
 
 All demo passwords: `DemoPass123!`. Seed accounts are for local development only and are not shown on the sign-in page.
 
@@ -82,7 +81,7 @@ Use `beta` and replace `alpha` with `beta` in the email for the second college.
 
 `User.status` is `PENDING` or `ACTIVE` (`sql/03_users.sql`). Students who self-register are `ACTIVE` immediately. Teachers who self-register are `PENDING` and receive 403 on sign-in until a College Admin approves them on the **People** page (`POST /api/users/:id/approve`). College Admins can also reject or deactivate teachers and students (`DELETE /api/users/:id`). This sets `a_in = 0` and deletes the user's sessions. Admin-created accounts start `ACTIVE`. Pending accounts are hidden from teachers' user lists.
 
-Super Admin emails are unique through the partial index `User_platform_email_key`, because `(collegeId, email)` does not cover NULL college IDs. Prisma cannot model partial indexes. If a future `prisma migrate dev` generates `DROP INDEX "User_platform_email_key"`, delete that line from the generated migration.
+Super Admin emails are unique through the partial index `User_platform_email_key` (see `sql/03_users.sql`), because `(collegeId, email)` does not cover NULL college IDs.
 
 ## Code layout
 
@@ -92,15 +91,39 @@ Server (`server/`):
 | --- | --- |
 | `nodeapp.js` | Loads `.env` and starts the listener |
 | `src/index.js` | Express setup: request logger, helmet, CORS, JSON body, `/api` routes, error handler |
-| `src/routes/api.routes.js` | URL → middleware → controller. `can(menuCode, action)` guards each route |
-| `src/controllers/*` | zod validation and responses only |
-| `src/models/*` | All Prisma queries, tenant scoping and permission data |
+| `src/routes/api.routes.js` | Mounts each feature's router in order: public, then JWT + session, then college context |
+| `src/modules/<feature>/routes/<feature>Rtr.js` | URL → middleware → controller. `can(menuCode, action)` guards each route |
+| `src/modules/<feature>/controllers/<feature>Ctrl.js` | zod validation and responses only; handlers are named `xxxCtrl` |
+| `src/modules/<feature>/models/<feature>Mdl.js` | All SQL queries, written out in full with `pg` (`db.many`, `db.one`, `db.run`, `db.transaction`), tenant scoping and permission data (`courseMdl`, `userMdl`, ...) |
 | `src/middleware/*` | `auth` (origin guard, JWT + session, college context), `permission`, `request-logger`, `error` |
 | `src/services/*` | Session store and token helpers, upstream proxy |
 | `src/utils/*` | `logger`, `http-error` (`fail`, `notFound`), `tree` (menu tree builder) |
 | `config/*` | `db.config`, `cors.config` (single origin allowlist), `proxy.config` (trust proxy, proxy targets) |
 
 Client (`client/src/`): `main.jsx` mounts React Router. `App.jsx` restores the session and creates routes from the database menu. `workspace.jsx` holds the signed-in state, including `menu` and `can(code, action)`. `components/AppLayout.jsx` renders the database sidebar. `pages/registry.js` maps menu URLs to pages.
+
+## Home page and vendors
+
+- The public site has five pages that need no sign-in: `/` (home), `/students`, `/institutes`, `/paths` and `/about` (`client/src/pages/*Page.jsx`, with the shared top bar and footer in `client/src/components/PublicShell.jsx` and the styles in `client/src/landing.css`). They use the NextByte green and gold theme with scroll animations that respect the reduced-motion setting. Their Log in menu and buttons open `/login`, `/login?mode=register` and `/login?as=vendor`. Signed-in users never see them; they go straight to their menu.
+- **Vendors** are platform accounts with no college. Only the Super Admin creates them (Colleges page → Vendors, or `POST /api/vendors`); there is no self-registration. A vendor signs in at `/login?as=vendor`, sees only the Coding Problems library and manages the problems they created. Existing databases get the role from `sql/patches/01_vendor_role.sql`.
+
+## Practice tracks and the coding library
+
+- Problems belong to a **track**: Python (the original 55 programs), C, Java, DSA, SQL, HTML & CSS, React, Git & GitHub and DevOps (126 in total). Students filter by track on the Coding practice page; authors pick a track in Manage problems.
+- Every track except DSA accepts only its own language (DSA accepts Python, Java, C, C++ or JavaScript).
+- How each track is judged (scripts in `server/judge`, all run by the local runner):
+
+| Track | Student writes | Judged by |
+| --- | --- | --- |
+| Python, C, Java, DSA | a program that reads stdin and prints | running it against hidden test cases |
+| SQL | one `SELECT` | `sql-judge.py`: runs it on an in-memory SQLite database built from each test case |
+| HTML & CSS | a page | `html-judge.py`: checks structure and styles, one requirement per test case |
+| React | a component (`export default`) | `react-judge.mjs`: compiles it with esbuild, renders it with the test's props and checks the HTML |
+| Git & GitHub | git commands, one per line | `git-judge.py`: runs them in a throw-away repository (allow-listed subcommands, no shell) and compares the resulting state; `origin` is a local stand-in for GitHub |
+| DevOps | a bash script, a Dockerfile or a YAML file | real `bash`; `devops-judge.py` checks Dockerfile instructions and YAML structure (GitHub Actions, Compose, Kubernetes) without running anything |
+
+- The check-based judges need only Python (plus Node for React and `git` for the Git track). React uses the `react`, `react-dom` and `esbuild` packages of the server. A language appears in the editor only when the server has what it needs; Judge0 mode supports only languages that have a Judge0 id (SQL, Bash and the usual programming languages).
+- Add problems in `server/data/coding/build-problems.py` (Python), `build-problems-extra.py` (C, Java, DSA, SQL, HTML & CSS) or `build-problems-devtools.py` (React, Git, DevOps), run `python3 -I server/data/coding/build-problems.py`, then `npm run coding:import -w server`. Existing databases get the track column from `sql/patches/02_problem_track.sql`.
 
 ## Database menus and permissions
 
@@ -163,7 +186,7 @@ To add a page:
 
 ## Implemented workflow
 
-Database settings in `server/config/db.config.js` now use APCMMS-style constants (`DB_HOST_NAME`, `DB_PORT`, `USER`, `PWD`, `DATABASE`). They are resolved from the ignored `.env`, with DATABASE_URL as the default source. Prisma manages a shared PostgreSQL pool capped at 10 connections per process by default, with a 10-second pool wait timeout. Adjust DB_CONNECTION_LIMIT and DB_POOL_TIMEOUT in `.env`. Optional connection overrides must match DATABASE_URL so runtime and migration commands target the same database.
+Database settings in `server/config/db.config.js` now use APCMMS-style constants (`DB_HOST_NAME`, `DB_PORT`, `USER`, `PWD`, `DATABASE`). They are resolved from the ignored `.env`, with DATABASE_URL as the default source. `pg` keeps a shared PostgreSQL pool capped at 10 connections per process by default, with a 10-second pool wait timeout. Adjust DB_CONNECTION_LIMIT and DB_POOL_TIMEOUT in `.env`. Optional connection overrides must match DATABASE_URL so runtime and migration commands target the same database.
 
 Teachers and College Admins can click **Manage course** to edit the course title, description and status, add, edit or delete modules and lessons, change their order, and manage co-instructors. Deletion is a soft delete (`a_in = 0`). Lessons in a deleted module are hidden and can no longer be completed. These operations use `server/src/controllers/course.controller.js` and `server/src/models/course.model.js`, preserve audit metadata, and enforce instructor scope and college isolation.
 
@@ -264,7 +287,7 @@ The **Assessments** menu (`/assessments`) covers quizzes, assignments and exams.
 The **Coding Practice** menu (`/coding`) is a HackerRank-style platform. Students solve problems in the language of their choice. Teachers and admins also write problems, and coding questions can be used in Assessments.
 
 - **Library:** 55 platform problems (`college_id` null), Easy → Hard: basics, conditions, loops, strings, arrays, matrices, searching, stacks, backtracking and dynamic programming. Each has sample and hidden stdin/stdout test cases.
-  - Source: `server/prisma/data/coding/build-problems.py`. Expected outputs are generated by running each problem's reference solution. Rebuild with `python -I prisma/data/coding/build-problems.py`, then load with `npm run coding:import` (also part of `npm run db:setup`; it upserts by slug). Library problems are published as **Practice and assessments**.
+  - Source: `server/data/coding/build-problems.py`. Expected outputs are generated by running each problem's reference solution. Rebuild with `python -I data/coding/build-problems.py`, then load with `npm run coding:import` (also part of `npm run db:setup`; it upserts by slug). Library problems are published as **Practice and assessments**.
 - **Editor:** Monaco (the VS Code editor), bundled locally and loaded only on coding screens. It has syntax highlighting for every judge language. A draft is kept per problem and per language, and the last language used is remembered.
 - **Practice screens:**
   - The problem list has filters, solved/attempted state, each problem's success rate in the college, and **Random unsolved**.
@@ -313,16 +336,16 @@ The **Coding Practice** menu (`/coding`) is a HackerRank-style platform. Student
 
 ### Importing a course from a PDF (Python PY101)
 
-The data lives in `server/prisma/data/courses/`: `python-basics-to-oop.json` (syllabus, units, lessons, page ranges) and `python-basics-to-oop/` (converted chapters: `chapter-N.md`, figure PNGs, `manifest.json`).
+The data lives in `server/data/courses/`: `python-basics-to-oop.json` (syllabus, units, lessons, page ranges) and `python-basics-to-oop/` (converted chapters: `chapter-N.md`, figure PNGs, `manifest.json`).
 
 ```powershell
 cd E:\LMS\server
 # 1. Create the course (units, lessons, syllabus details) and link the notes PDF; chapter PDFs are cut from the page ranges.
-node scripts/import-course.mjs --file prisma/data/courses/python-basics-to-oop.json --college <college code> --owner <teacher or admin email> --notes "<path to notes.pdf>" --publish
+node scripts/import-course.mjs --file data/courses/python-basics-to-oop.json --college <college code> --owner <teacher or admin email> --notes "<path to notes.pdf>" --publish
 # 2. Load the formatted chapter text and figures into the lessons.
-node scripts/import-chapter-content.mjs --file prisma/data/courses/python-basics-to-oop.json --college <college code> --content prisma/data/courses/python-basics-to-oop
+node scripts/import-chapter-content.mjs --file data/courses/python-basics-to-oop.json --college <college code> --content data/courses/python-basics-to-oop
 # Optional: attach chapter PDFs to a course imported without --notes.
-node scripts/attach-chapters.mjs --file prisma/data/courses/python-basics-to-oop.json --college <college code> --notes "<path to notes.pdf>"
+node scripts/attach-chapters.mjs --file data/courses/python-basics-to-oop.json --college <college code> --notes "<path to notes.pdf>"
 ```
 
 To convert another PDF with the same layout, run `python -I scripts/pdf-to-markdown.py <notes.pdf> <course.json> <output folder>` (needs PyMuPDF). It reads fonts and positions: blue 13pt headings, Consolas code boxes, "Output:" blocks, bullet lists, white-header tables and captioned figures. A PDF with a different layout needs its rules adjusted.
@@ -356,7 +379,7 @@ Tables: `sql/07_academic_years.sql` â€¦ `sql/12_cohorts.sql`, `sql/18_audit_
 
 ## Validation
 
-All eight application tables use APCMMS-style audit columns: `crte_usr_id` (creator), `updte_usr_id` (updater), `i_ts` (insert time), `u_ts` (update time), `a_in` (1 active / 0 inactive), and `d_ts` (deactivation time). Prisma maps these to camelCase properties. PostgreSQL triggers keep creation metadata unchanged, update `u_ts` on SQL updates, set `d_ts` on deactivation, and clear it on reactivation. The API supplies the authenticated actor on writes and excludes inactive records. College suspension remains the separate `active` setting. Session logout still deletes its session record for revocation. Legacy/seed creator IDs stay null when the original actor is unknown; timestamps that already existed are retained. Tables: `sql/00_types_and_functions.sql`.
+All eight application tables use APCMMS-style audit columns: `crte_usr_id` (creator), `updte_usr_id` (updater), `i_ts` (insert time), `u_ts` (update time), `a_in` (1 active / 0 inactive), and `d_ts` (deactivation time). The SQL aliases columns to camelCase (`a_in AS "activeIndicator"`). PostgreSQL triggers keep creation metadata unchanged, update `u_ts` on SQL updates, set `d_ts` on deactivation, and clear it on reactivation. The API supplies the authenticated actor on writes and excludes inactive records. College suspension remains the separate `active` setting. Session logout still deletes its session record for revocation. Legacy/seed creator IDs stay null when the original actor is unknown; timestamps that already existed are retained. Tables: `sql/00_types_and_functions.sql`.
 
 ```powershell
 npm run build

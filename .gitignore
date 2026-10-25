@@ -6,3 +6,5 @@ dist/
 *.tsbuildinfo
 server/logs/
 server/uploads/
+server/data/coding/.reference-cache.json
+__pycache__/

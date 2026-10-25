@@ -5,20 +5,32 @@
 BEGIN;
 
 CREATE TABLE public.btch_lst_t (
-    btch_id text NOT NULL,
-    college_id text NOT NULL,
-    prgm_id text NOT NULL,
-    acdmc_yr_id text NOT NULL,
+    btch_id integer NOT NULL,
+    college_id integer NOT NULL,
+    prgm_id integer NOT NULL,
+    acdmc_yr_id integer NOT NULL,
     btch_nm text NOT NULL,
     section_tx text DEFAULT ''::text NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT btch_lst_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.btch_lst_t_btch_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.btch_lst_t_btch_id_seq OWNED BY public.btch_lst_t.btch_id;
+
+ALTER TABLE ONLY public.btch_lst_t ALTER COLUMN btch_id SET DEFAULT nextval('public.btch_lst_t_btch_id_seq'::regclass);
 
 ALTER TABLE ONLY public.btch_lst_t
     ADD CONSTRAINT btch_lst_t_pkey PRIMARY KEY (btch_id);

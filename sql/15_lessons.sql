@@ -5,23 +5,23 @@
 BEGIN;
 
 CREATE TABLE public."Lesson" (
-    id text NOT NULL,
-    "collegeId" text NOT NULL,
+    id integer NOT NULL,
+    "collegeId" integer NOT NULL,
     title text NOT NULL,
     content text DEFAULT ''::text NOT NULL,
     "position" integer DEFAULT 0 NOT NULL,
-    "moduleId" text NOT NULL,
+    "moduleId" integer NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     allow_download_in smallint DEFAULT 0 NOT NULL,
     duration_sec integer,
-    file_id text,
+    file_id integer,
     lesson_type public."LessonType" DEFAULT 'TEXT'::public."LessonType" NOT NULL,
-    prerequisite_lesson_id text,
+    prerequisite_lesson_id integer,
     published_in smallint DEFAULT 1 NOT NULL,
     content_fmt_cd public."ContentFormat" DEFAULT 'TEXT'::public."ContentFormat" NOT NULL,
     CONSTRAINT "Lesson_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1]))),
@@ -29,6 +29,18 @@ CREATE TABLE public."Lesson" (
     CONSTRAINT "Lesson_flags_check" CHECK (((allow_download_in = ANY (ARRAY[0, 1])) AND (published_in = ANY (ARRAY[0, 1])))),
     CONSTRAINT "Lesson_prerequisite_self_check" CHECK (((prerequisite_lesson_id IS NULL) OR (prerequisite_lesson_id <> id)))
 );
+
+CREATE SEQUENCE public."Lesson_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."Lesson_id_seq" OWNED BY public."Lesson".id;
+
+ALTER TABLE ONLY public."Lesson" ALTER COLUMN id SET DEFAULT nextval('public."Lesson_id_seq"'::regclass);
 
 ALTER TABLE ONLY public."Lesson"
     ADD CONSTRAINT "Lesson_pkey" PRIMARY KEY (id);

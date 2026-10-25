@@ -11,13 +11,19 @@ import 'monaco-editor/esm/vs/basic-languages/go/go.contribution';
 import 'monaco-editor/esm/vs/basic-languages/kotlin/kotlin.contribution';
 import 'monaco-editor/esm/vs/basic-languages/ruby/ruby.contribution';
 import 'monaco-editor/esm/vs/basic-languages/php/php.contribution';
+import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution';
+import 'monaco-editor/esm/vs/basic-languages/html/html.contribution';
+import 'monaco-editor/esm/vs/basic-languages/css/css.contribution';
+import 'monaco-editor/esm/vs/basic-languages/shell/shell.contribution';
+import 'monaco-editor/esm/vs/basic-languages/dockerfile/dockerfile.contribution';
+import 'monaco-editor/esm/vs/basic-languages/yaml/yaml.contribution';
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 
 self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco });
 
 // Judge language id -> Monaco language mode.
-const MODES = { python: 'python', java: 'java', c: 'c', cpp: 'cpp', javascript: 'javascript', csharp: 'csharp', go: 'go', kotlin: 'kotlin', ruby: 'ruby', php: 'php' };
+const MODES = { python: 'python', java: 'java', c: 'c', cpp: 'cpp', javascript: 'javascript', csharp: 'csharp', go: 'go', kotlin: 'kotlin', ruby: 'ruby', php: 'php', sql: 'sql', html: 'html', react: 'javascript', git: 'shell', bash: 'shell', dockerfile: 'dockerfile', yaml: 'yaml' };
 
 export default function MonacoEditor({ value, onChange, language, height = '100%', readOnly = false }) {
     return <Editor

@@ -9,7 +9,8 @@ import { getProblemSolutions } from './referenceSolutions';
 const CHECKERS = { TRIMMED: 'Trimmed (ignore trailing spaces)', EXACT: 'Exact', TOKEN: 'Tokens (any spacing)', CASE_INSENSITIVE: 'Case-insensitive', NUMERIC: 'Numbers within epsilon', UNORDERED: 'Lines in any order' };
 const SCORING = { WEIGHTED: 'Weighted (partial marks per case)', GROUP: 'Groups (all cases in a group)', BINARY: 'All or nothing' };
 const VISIBILITY = { PRACTICE: 'Practice only', SHARED: 'Practice and assessments', ASSESSMENT: 'Assessments only' };
-const blank = { title: '', difficulty: 'EASY', topic: '', statement: '', inputFormat: '', outputFormat: '', constraints: '', timeLimitMs: 2000, memoryLimitMb: 256, visibility: 'PRACTICE', languages: [], checker: 'TRIMMED', epsilon: 0.000001, scoring: 'WEIGHTED', maxScore: 100, referenceLanguage: 'python', referenceSolution: '' };
+const TRACKS = ['General', 'Python', 'C', 'Java', 'DSA', 'SQL', 'HTML & CSS', 'React', 'Git & GitHub', 'DevOps'];
+const blank = { title: '', difficulty: 'EASY', topic: '', track: 'General', statement: '', inputFormat: '', outputFormat: '', constraints: '', timeLimitMs: 2000, memoryLimitMb: 256, visibility: 'PRACTICE', languages: [], checker: 'TRIMMED', epsilon: 0.000001, scoring: 'WEIGHTED', maxScore: 100, referenceLanguage: 'python', referenceSolution: '' };
 const blankCase = { input: '', expectedOutput: '', isSample: false, weight: 1, group: '', explanation: '' };
 const when = value => value ? new Date(value).toLocaleString() : '-';
 
@@ -73,6 +74,7 @@ function DetailsForm({ problem, languages, onSaved }) {
         <div className="academic-fields">
             <label>Title<input required minLength={3} {...field('title')}/></label>
             <label>Difficulty<select {...field('difficulty')}><option value="EASY">Easy</option><option value="MEDIUM">Medium</option><option value="HARD">Hard</option></select></label>
+            <label>Track<select {...field('track')}>{TRACKS.map(track => <option key={track}>{track}</option>)}</select></label>
             <label>Topic<input {...field('topic')} placeholder="e.g. Arrays"/></label>
             <label>Where it appears<select {...field('visibility')}>{Object.entries(VISIBILITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         </div>

@@ -5,21 +5,33 @@
 BEGIN;
 
 CREATE TABLE public.acdmc_yr_lst_t (
-    acdmc_yr_id text NOT NULL,
-    college_id text NOT NULL,
+    acdmc_yr_id integer NOT NULL,
+    college_id integer NOT NULL,
     acdmc_yr_nm text NOT NULL,
     start_dt date NOT NULL,
     end_dt date NOT NULL,
     is_crnt_in smallint DEFAULT 0 NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT acdmc_yr_lst_t_dates_check CHECK ((end_dt > start_dt)),
     CONSTRAINT acdmc_yr_lst_t_flags_check CHECK (((is_crnt_in = ANY (ARRAY[0, 1])) AND (a_in = ANY (ARRAY[0, 1]))))
 );
+
+CREATE SEQUENCE public.acdmc_yr_lst_t_acdmc_yr_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.acdmc_yr_lst_t_acdmc_yr_id_seq OWNED BY public.acdmc_yr_lst_t.acdmc_yr_id;
+
+ALTER TABLE ONLY public.acdmc_yr_lst_t ALTER COLUMN acdmc_yr_id SET DEFAULT nextval('public.acdmc_yr_lst_t_acdmc_yr_id_seq'::regclass);
 
 ALTER TABLE ONLY public.acdmc_yr_lst_t
     ADD CONSTRAINT acdmc_yr_lst_t_pkey PRIMARY KEY (acdmc_yr_id);

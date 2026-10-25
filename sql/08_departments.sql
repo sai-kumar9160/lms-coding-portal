@@ -5,19 +5,31 @@
 BEGIN;
 
 CREATE TABLE public.dept_lst_t (
-    dept_id text NOT NULL,
-    college_id text NOT NULL,
+    dept_id integer NOT NULL,
+    college_id integer NOT NULL,
     dept_cd text NOT NULL,
     dept_nm text NOT NULL,
-    hod_usr_id text,
+    hod_usr_id integer,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     CONSTRAINT dept_lst_t_a_in_check CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public.dept_lst_t_dept_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.dept_lst_t_dept_id_seq OWNED BY public.dept_lst_t.dept_id;
+
+ALTER TABLE ONLY public.dept_lst_t ALTER COLUMN dept_id SET DEFAULT nextval('public.dept_lst_t_dept_id_seq'::regclass);
 
 ALTER TABLE ONLY public.dept_lst_t
     ADD CONSTRAINT dept_lst_t_pkey PRIMARY KEY (dept_id);

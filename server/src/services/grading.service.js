@@ -7,11 +7,11 @@ export function isAnswered(question, answer) {
     if (!answer) return false;
     switch (question.questionType) {
         case 'SINGLE_CHOICE':
-        case 'TRUE_FALSE': return typeof answer.optionId === 'string';
+        case 'TRUE_FALSE': return Number.isInteger(answer.optionId);
         case 'MULTIPLE_CHOICE': return Array.isArray(answer.optionIds) && answer.optionIds.length > 0;
         case 'NUMERIC': return typeof answer.value === 'number' && Number.isFinite(answer.value);
         case 'SHORT_ANSWER': return typeof answer.text === 'string' && answer.text.trim() !== '';
-        case 'CODING': return typeof answer.submissionId === 'string'; // marked from judged submissions, see attempt.model.js
+        case 'CODING': return Number.isInteger(answer.submissionId); // marked from judged submissions, see attempt.model.js
         default: return false;
     }
 }

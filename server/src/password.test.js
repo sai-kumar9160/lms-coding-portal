@@ -3,11 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 process.env.NODE_ENV = 'test';
-const { app, db: appDb } = await import('./index.js');
+const { app } = await import('./index.js');
 const { testOutbox } = await import('./services/mail.service.js');
-const db = createDatabaseClient();
 const origin = 'http://localhost:5173';
 
 test('forgot password: neutral answers, one-time expiring links, sign-out everywhere', async () => {
@@ -48,7 +48,7 @@ test('forgot password: neutral answers, one-time expiring links, sign-out everyw
         assert.equal(testOutbox[0].to, 'student@reset.local');
         assert.ok(testOutbox[0].text.includes(`${origin}/reset-password?token=`), 'Link opens the frontend the request came from');
         const token = linkToken(testOutbox[0]);
-        const stored = await db.passwordReset.findFirstOrThrow({ where: { user: { email: 'student@reset.local', collegeId } } });
+        const stored = await db.one(`SELECT r.tkn_hash_tx AS "tokenHash", r.expires_ts AS "expiresAt" FROM pwd_rst_tkn_dtl_t r JOIN "User" u ON u.id = r.user_id WHERE u.email = 'student@reset.local' AND u."collegeId" = $1`, [collegeId]);
         assert.equal(stored.tokenHash, createHash('sha256').update(token).digest('hex'), 'Only the hash is stored');
         assert.notEqual(stored.tokenHash, token);
         assert.ok(stored.expiresAt.getTime() - Date.now() <= 30 * 60000);
@@ -67,27 +67,26 @@ test('forgot password: neutral answers, one-time expiring links, sign-out everyw
 
         // Expired links are rejected.
         const expiredToken = 'expired-token-for-test-0123456789abcdef';
-        const student = await db.user.findFirstOrThrow({ where: { email: 'student@reset.local', collegeId } });
-        await db.passwordReset.create({ data: { userId: student.id, tokenHash: createHash('sha256').update(expiredToken).digest('hex'), expiresAt: new Date(Date.now() - 1000) } });
+        const student = await findOne('user', { email: 'student@reset.local', collegeId });
+        await db.run('INSERT INTO pwd_rst_tkn_dtl_t (rst_tkn_id, user_id, tkn_hash_tx, expires_ts) VALUES (DEFAULT, $1, $2, $3)', [student.id, createHash('sha256').update(expiredToken).digest('hex'), new Date(Date.now() - 1000)]);
         assert.equal((await request('/auth/reset-password', '', 'POST', { token: expiredToken, password: 'AnotherPass123!' })).status, 400);
 
         // Platform accounts reset with the college left empty.
-        await db.passwordReset.deleteMany({ where: { user: { email: 'super@lms.local', collegeId: null }, createdAt: { gte: started } } });
+        await db.run(`DELETE FROM pwd_rst_tkn_dtl_t r USING "User" u WHERE u.id = r.user_id AND u.email = 'super@lms.local' AND u."collegeId" IS NULL AND r.i_ts >= $1`, [started]);
         assert.equal((await request('/auth/forgot-password', '', 'POST', { email: 'super@lms.local' })).status, 200);
         assert.equal(testOutbox.at(-1).to, 'super@lms.local');
     }
     finally {
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
+        await remove('session', { sid: sids });
         // Remove the Super Admin's test link so it cannot be used.
-        await db.passwordReset.deleteMany({ where: { user: { email: 'super@lms.local', collegeId: null }, createdAt: { gte: started } } });
+        await db.run(`DELETE FROM pwd_rst_tkn_dtl_t r USING "User" u WHERE u.id = r.user_id AND u.email = 'super@lms.local' AND u."collegeId" IS NULL AND r.i_ts >= $1`, [started]);
         if (collegeId) {
-            await db.user.deleteMany({ where: { collegeId } });
-            await db.auditLog.deleteMany({ where: { collegeId } });
-            await db.college.deleteMany({ where: { id: collegeId } });
+            await remove('user', { collegeId });
+            await remove('auditLog', { collegeId });
+            await remove('college', { id: collegeId });
         }
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

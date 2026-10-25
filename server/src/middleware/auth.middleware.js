@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { jwtSecret, jwtOptions, identitySchema, sessionUser, checkCsrf } from '../services/session.service.js';
 import { isAllowedOrigin } from '../../config/cors.config.js';
-import { platformModel } from '../models/platform.model.js';
+import { platformMdl } from '../modules/platform/models/platformMdl.js';
 import { fail, notFound } from '../utils/http-error.js';
 export { sessionMiddleware } from '../services/session.service.js';
 
@@ -13,7 +13,7 @@ async function actInCollege(req, role, requested) {
         return;
     if (typeof requested !== 'string' || !/^[1-9][0-9]*$/.test(requested) || !Number.isSafeInteger(Number(requested)) || Number(requested) > 2147483647)
         fail(400, 'Invalid college');
-    if (!await platformModel.switchableCollege(Number(requested)))
+    if (!await platformMdl.switchableCollege(Number(requested)))
         notFound('College');
     req.collegeId = Number(requested);
     req.actingAsSuperAdmin = true;

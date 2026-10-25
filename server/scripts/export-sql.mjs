@@ -3,8 +3,7 @@
 // constraints, indexes, triggers, reference data (roles, menus, permissions) and foreign keys. Files run in
 // numeric order on an empty database; a foreign key to a table in a later file is placed in that later file.
 //
-// Source: the database in DATABASE_URL (it must have every Prisma migration applied). The Prisma migrations in
-// server/prisma/migrations stay the history Prisma applies; never edit an applied migration.
+// Source: the database in DATABASE_URL (built by npm run db:setup). Use this after changing a table directly in the database.
 // Usage (from E:\LMS): npm run db:export      Needs pg_dump (PostgreSQL bin) on PATH or in PG_BIN.
 import { config } from 'dotenv';
 import fs from 'node:fs';
@@ -19,7 +18,7 @@ const destination = path.resolve(server, '..', 'sql');
 // File order follows the foreign keys. Tables with reference data get their rows exported too.
 const GROUPS = [
     { file: 'types_and_functions', about: 'Enum types and the audit/role trigger functions used by the tables', tables: [] },
-    { file: 'roles', about: 'Role master (Super Admin, College Admin, Teacher, Student) with its rows', tables: ['role_t'], data: true },
+    { file: 'roles', about: 'Role master (Super Admin, College Admin, Teacher, Student, Vendor) with its rows', tables: ['role_t'], data: true },
     { file: 'colleges', about: 'Colleges (tenants)', tables: ['College'] },
     { file: 'users', about: 'Users of every role, with status, mobile number and role checks', tables: ['User'] },
     { file: 'password_resets', about: 'One-time password reset links (token hashes only)', tables: ['pwd_rst_tkn_dtl_t'] },
@@ -43,12 +42,12 @@ const GROUPS = [
     { file: 'coding_practice', about: 'Coding problems, test cases and submissions (problem rows: npm run coding:import)', tables: ['cdng_prblm_lst_t', 'cdng_tst_cs_lst_t', 'cdng_sbmsn_dtl_t'] },
 ];
 const SKIP_BLOCK = Symbol('skip');
-const SKIP = new Set(['_prisma_migrations', SKIP_BLOCK]);
+const SKIP = new Set([SKIP_BLOCK]);
 
 function pgDump(args) {
     const exe = process.env.PG_BIN ? path.join(process.env.PG_BIN, 'pg_dump') : ['C:/Program Files/PostgreSQL/18/bin/pg_dump.exe'].find(p => fs.existsSync(p)) ?? 'pg_dump';
     const url = new URL(process.env.DATABASE_URL);
-    url.search = ''; // Prisma's ?schema=public is not a libpq option
+    url.search = ''; // drop query parameters such as ?schema=public, which libpq does not accept
     return execFileSync(exe, [`--dbname=${url}`, '--no-owner', '--no-privileges', '--no-comments', '--schema=public', ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] })
         .replace(/\r\n/g, '\n'); // pg_dump writes CRLF on Windows
 }

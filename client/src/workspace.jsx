@@ -21,7 +21,9 @@ export function WorkspaceProvider({ onSignedOut, children }) {
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const [busy, setBusy] = useState(false);
-    const [modal, setModal] = useState('');
+    const [modal, setModalValue] = useState('');
+    // The dialog value is text such as 'manage:7' or a course id; ids are numbers, so keep it as text everywhere.
+    const setModal = value => setModalValue(value === '' || value == null ? '' : String(value));
     async function api(path, method = 'GET', body) {
         try {
             return await request(path, method, body);

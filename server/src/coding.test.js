@@ -3,16 +3,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import jwt from 'jsonwebtoken';
-import { createDatabaseClient } from '../config/db.config.js';
+import { db } from '../config/db.config.js';
+import { change, countRows, findFirst, findOne, remove } from './test-helpers.js';
 import { CHECKERS, scoreCases } from './services/checker.service.js';
 process.env.NODE_ENV = 'test';
 process.env.CODE_RUNNER = 'local';
-const { app, db: appDb } = await import('./index.js');
+const { app } = await import('./index.js');
 const { runProgram, languages, sameOutput } = await import('./services/code-runner.service.js');
 const { startJudgeWorker } = await import('./services/judge.service.js');
 const { importProblems } = await import('../scripts/import-problems.mjs');
-const db = createDatabaseClient();
-const library = JSON.parse(fs.readFileSync(new URL('../prisma/data/coding/problems.json', import.meta.url), 'utf8'));
+const library = JSON.parse(fs.readFileSync(new URL('../data/coding/problems.json', import.meta.url), 'utf8'));
 
 test('output checkers and scoring modes', () => {
     assert.ok(sameOutput('1 2 \r\n3\n\n', '1 2\n3'));
@@ -31,13 +31,22 @@ test('output checkers and scoring modes', () => {
 });
 
 test('every library problem is solved by its reference solution through the runner', async () => {
-    assert.ok(library.length >= 50);
-    assert.ok(languages().some(l => l.id === 'python' && l.available), 'Python must be installed to run this test');
+    assert.ok(library.length >= 120);
+    assert.deepEqual([...new Set(library.map(p => p.track))].sort(), ['C', 'DSA', 'DevOps', 'Git & GitHub', 'HTML & CSS', 'Java', 'Python', 'React', 'SQL']);
+    const installed = new Set(languages().filter(l => l.available).map(l => l.id));
+    assert.ok(installed.has('python'), 'Python must be installed to run this test');
+    let checked = 0;
     for (const problem of library) {
-        const run = await runProgram('python', problem.solution, problem.tests.map(t => ({ input: t.input, expectedOutput: t.output })), 10000);
+        // Each track's reference solution is written in that track's language; skip a track whose toolchain is not installed here.
+        const language = problem.language ?? 'python';
+        if (!installed.has(language)) continue;
+        assert.deepEqual(problem.languages ?? null, problem.track === 'DSA' ? null : [language], `${problem.slug} allows only its own language`);
+        const run = await runProgram(language, problem.solution, problem.tests.map(t => ({ input: t.input, expectedOutput: t.output })), 10000);
         assert.equal(run.compileError, undefined, problem.slug);
         assert.deepEqual(run.results.map(r => r.status), problem.tests.map(() => 'PASSED'), problem.slug);
+        checked++;
     }
+    assert.ok(checked >= 55);
 });
 
 test('coding platform: queue, practice, authoring, visibility and coding questions in exams', async () => {
@@ -91,9 +100,15 @@ test('coding platform: queue, practice, authoring, visibility and coding questio
         assert.equal(detail.samples.length, 2);
         assert.equal(detail.testCases, undefined);
         assert.equal(detail.referenceSolution, undefined, 'Reference solutions never reach students');
+        // Python problems open with the input already read (never the part that solves the problem).
+        assert.equal(detail.starters.python, "if __name__ == '__main__':\n    a, b = map(int, input().split())\n    \n");
+        assert.ok(!detail.starters.python.includes('print'), 'A starter must not contain the solution');
+        assert.ok(typeof detail.pseudocode === 'string' && detail.pseudocode.includes('READ'), 'The problem page gets its pseudocode');
+        assert.ok(detail.explanation.includes('## Step by step'), 'and its explanation');
 
-        const js = "const [a, b] = require('fs').readFileSync(0, 'utf8').trim().split(/\\s+/).map(Number);\nconsole.log(a + b);\n";
-        const ran = await judged(student, `/coding/problems/${sum.id}/run`, { language: 'javascript', code: js });
+        // The Python track is limited to Python, so that is the language a student must use for this library problem.
+        const js = 'a, b = map(int, input().split())\nprint(a + b)\n';
+        const ran = await judged(student, `/coding/problems/${sum.id}/run`, { language: 'python', code: js });
         assert.equal(ran.status, 'ACCEPTED');
         assert.equal(ran.tests[0].stdout.trim(), '8');
         assert.ok(ran.tests[0].expected !== undefined && ran.limits.timeLimitMs > 0);
@@ -108,7 +123,7 @@ test('coding platform: queue, practice, authoring, visibility and coding questio
         const hello = list.problems.find(p => p.slug === 'hello-world');
         assert.equal((await judged(student, `/coding/problems/${hello.id}/run`, { language: 'python', code: 'while True:\n    pass' })).status, 'TIME_LIMIT');
         assert.equal((await request(`/coding/problems/${sum.id}/run`, student, 'POST', { language: 'cobol', code: 'x' })).status, 400);
-        const accepted = await judged(student, `/coding/problems/${sum.id}/submit`, { language: 'javascript', code: js });
+        const accepted = await judged(student, `/coding/problems/${sum.id}/submit`, { language: 'python', code: js });
         assert.equal(accepted.status, 'ACCEPTED');
         assert.equal(accepted.score, 100);
         const after = (await request('/coding/problems', student)).data.problems.find(p => p.id === sum.id);
@@ -196,17 +211,16 @@ test('coding platform: queue, practice, authoring, visibility and coding questio
     finally {
         await worker.stop();
         const sids = [...sessions.keys()].map(token => jwt.decode(token)?.sid).filter(sid => typeof sid === 'string');
-        await db.session.deleteMany({ where: { sid: { in: sids } } });
-        await db.attempt.deleteMany({ where: { collegeId: { in: created } } });
-        await db.assessment.deleteMany({ where: { collegeId: { in: created } } });
-        await db.question.deleteMany({ where: { collegeId: { in: created } } });
-        await db.codingSubmission.deleteMany({ where: { collegeId: { in: created } } });
-        await db.codingProblem.deleteMany({ where: { collegeId: { in: created } } });
-        await db.auditLog.deleteMany({ where: { collegeId: { in: created } } });
-        await db.user.deleteMany({ where: { collegeId: { in: created } } });
-        await db.college.deleteMany({ where: { id: { in: created } } });
+        await remove('session', { sid: sids });
+        await remove('attempt', { collegeId: created });
+        await remove('assessment', { collegeId: created });
+        await remove('question', { collegeId: created });
+        await remove('codingSubmission', { collegeId: created });
+        await remove('codingProblem', { collegeId: created });
+        await remove('auditLog', { collegeId: created });
+        await remove('user', { collegeId: created });
+        await remove('college', { id: created });
         await new Promise(resolve => server.close(() => resolve()));
-        await db.$disconnect();
-        await appDb.$disconnect();
+        await db.end();
     }
 });

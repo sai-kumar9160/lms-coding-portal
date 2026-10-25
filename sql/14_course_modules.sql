@@ -5,20 +5,32 @@
 BEGIN;
 
 CREATE TABLE public."CourseModule" (
-    id text NOT NULL,
-    "collegeId" text NOT NULL,
+    id integer NOT NULL,
+    "collegeId" integer NOT NULL,
     title text NOT NULL,
     "position" integer DEFAULT 0 NOT NULL,
-    "courseId" text NOT NULL,
+    "courseId" integer NOT NULL,
     i_ts timestamp(3) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     u_ts timestamp(3) without time zone,
-    crte_usr_id text,
-    updte_usr_id text,
+    crte_usr_id integer,
+    updte_usr_id integer,
     a_in smallint DEFAULT 1 NOT NULL,
     d_ts timestamp(3) without time zone,
     module_dscn_tx text DEFAULT ''::text NOT NULL,
     CONSTRAINT "CourseModule_a_in_check" CHECK ((a_in = ANY (ARRAY[0, 1])))
 );
+
+CREATE SEQUENCE public."CourseModule_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public."CourseModule_id_seq" OWNED BY public."CourseModule".id;
+
+ALTER TABLE ONLY public."CourseModule" ALTER COLUMN id SET DEFAULT nextval('public."CourseModule_id_seq"'::regclass);
 
 ALTER TABLE ONLY public."CourseModule"
     ADD CONSTRAINT "CourseModule_pkey" PRIMARY KEY (id);

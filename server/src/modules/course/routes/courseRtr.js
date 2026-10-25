@@ -1,0 +1,24 @@
+import { Router } from 'express';
+import { requirePermission as can } from '../../../middleware/permission.middleware.js';
+import * as courses from '../controllers/courseCtrl.js';
+import * as courseImport from '../controllers/courseImportCtrl.js';
+import { numericIds } from '../../../utils/ids.js';
+
+export const courseRoutes = numericIds(Router());
+courseRoutes.get('/courses', can('courses'), courses.listCoursesCtrl);
+courseRoutes.get('/courses/:id/syllabus/pdf', can('courses'), courses.syllabusPdfCtrl);
+courseRoutes.get('/lessons/:id/content', can('courses'), courses.lessonContentCtrl);
+courseRoutes.post('/courses', can('courses', 'create'), courses.createCourseCtrl);
+courseRoutes.post('/courses/from-pdf', can('courses', 'create'), courseImport.createFromPdfCtrl);
+courseRoutes.post('/courses/:id/rebuild-from-pdf', can('courses', 'update'), courseImport.rebuildFromPdfCtrl);
+courseRoutes.patch('/courses/:id', can('courses', 'update'), courses.updateCourseCtrl);
+courseRoutes.post('/courses/:id/modules', can('courses', 'update'), courses.createModuleCtrl);
+courseRoutes.patch('/courses/:id/modules/:moduleId', can('courses', 'update'), courses.updateModuleCtrl);
+courseRoutes.delete('/courses/:id/modules/:moduleId', can('courses', 'delete'), courses.deleteModuleCtrl);
+courseRoutes.post('/courses/:id/modules/:moduleId/lessons', can('courses', 'update'), courses.createLessonCtrl);
+courseRoutes.patch('/courses/:id/modules/:moduleId/lessons/:lessonId', can('courses', 'update'), courses.updateLessonCtrl);
+courseRoutes.delete('/courses/:id/modules/:moduleId/lessons/:lessonId', can('courses', 'delete'), courses.deleteLessonCtrl);
+courseRoutes.post('/courses/:id/instructors', can('courses', 'update'), courses.addInstructorCtrl);
+courseRoutes.delete('/courses/:id/instructors/:userId', can('courses', 'update'), courses.removeInstructorCtrl);
+courseRoutes.post('/lessons/:id/complete', can('enrollments', 'update'), courses.completeLessonCtrl);
+courseRoutes.post('/lessons/:id/progress', can('enrollments', 'update'), courses.saveProgressCtrl);
