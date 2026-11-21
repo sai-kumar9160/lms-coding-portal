@@ -9,6 +9,7 @@ import { InstituteLandingPage } from './pages/InstituteLandingPage';
 import { StudentLandingPage } from './pages/StudentLandingPage';
 import { PathsPage } from './pages/PathsPage';
 import { AboutPage } from './pages/AboutPage';
+import { NotesPage } from './pages/NotesPage';
 import { menuPages, pageRegistry } from './pages/registry';
 
 // Routes exist only for menu items the role can view, so unpermitted URLs redirect to the first page.
@@ -42,10 +43,12 @@ export function App() {
             <Route path="/colleges" element={<Navigate to="/institutes" replace/>}/>
             <Route path="/paths" element={<PathsPage/>}/>
             <Route path="/about" element={<AboutPage/>}/>
+            <Route path="/notes" element={<NotesPage/>}/>
             <Route path="/students" element={<StudentLandingPage/>}/>
             <Route path="/login" element={<AuthPage onLogin={newToken => { setError(''); setToken(newToken); navigate('/overview', { replace: true }); }}/>}/>
             <Route path="/reset-password" element={<AuthPage onLogin={newToken => { setToken(newToken); navigate('/overview', { replace: true }); }}/>}/>
-            <Route path="*" element={<Navigate to="/" replace/>}/>
+            {/* Protected URLs (and the moment right after signing out) land on the sign-in page, not the public home. */}
+            <Route path="*" element={<Navigate to="/login" replace/>}/>
         </Routes></>;
     return <WorkspaceProvider key={token} onSignedOut={() => { setToken(''); navigate('/login', { replace: true }); }}><MenuRoutes/></WorkspaceProvider>;
 }

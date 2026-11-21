@@ -1,10 +1,11 @@
 import { PaginatedItems } from '../components/Pagination';
 import { useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowUpRight, BookOpen, CheckCircle2, Home, Lock, PlayCircle, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BookOpen, NotebookText, CheckCircle2, Home, Lock, PlayCircle, Plus } from 'lucide-react';
 import { useWorkspace } from '../workspace';
 import { SyllabusView } from '../components/SyllabusView';
 import { LessonReader } from '../components/LessonReader';
+import { NotesReader, languages as noteLanguages } from './NotesPage';
 
 const levels = { BEGINNER: 'Beginner', INTERMEDIATE: 'Intermediate', ADVANCED: 'Advanced' };
 const completedAt = lesson => lesson.progress[0]?.completedAt;
@@ -13,6 +14,16 @@ const visibleLessons = lessons => lessons.filter(lesson => !hiddenLessonTitles.h
 
 // Tutorial layout: the course's lessons in a left sidebar,
 // and the selected lesson's text on the right. URL: /courses?course=<id>&lesson=<id>.
+// Built-in study notes, shown beside the college's courses and opened inside this page: /courses?notes=<language>&topic=<id>.
+function NotesCards({ onOpen }) {
+    return <>{noteLanguages.map(item => <button key={item.language} className="course-option" onClick={() => onOpen(item)}>
+        <span className="course-option-tags"><span className="tag">Notes</span></span>
+        <strong>{item.language} Notes</strong>
+        <small className="muted"><NotebookText size={13}/> {item.topics.length} topics · theory, diagrams and examples</small>
+        <span className="course-option-open">Start reading <ArrowUpRight size={15}/></span>
+    </button>)}</>;
+}
+
 export function CoursesPage() {
     const { courses, inCollege, can, college, setModal, isSuper, colleges, switchCollege, busy } = useWorkspace();
     const [params, setParams] = useSearchParams();
@@ -20,17 +31,28 @@ export function CoursesPage() {
     const course = selectedCourse && { ...selectedCourse, modules: selectedCourse.modules.map(module => ({ ...module, lessons: visibleLessons(module.lessons) })) };
     const lessonId = params.get('lesson');
     useEffect(() => { window.scrollTo({ top: 0 }); }, [course?.id, lessonId]);
+    const notes = noteLanguages.find(item => item.language.toLowerCase() === params.get('notes'));
+    const openNotes = item => setParams({ notes: item.language.toLowerCase(), topic: item.topics[0].id });
+    if (notes)
+        return <section>
+            <button className="text-button back-to-courses" onClick={() => setParams({})}><ArrowLeft size={15}/>All courses</button>
+            <div className="lp nt-embed"><NotesReader embedded language={notes} topicId={params.get('topic')} onTopic={id => setParams({ notes: notes.language.toLowerCase(), topic: id })}/></div>
+        </section>;
     if (!inCollege)
         return <section className="panel">
             <div className="section-title"><div><h2>Courses</h2><p className="muted">Choose a college to create and manage its courses.</p></div></div>
             {isSuper && <label className="people-college-picker">College<select value="" disabled={busy} onChange={event => switchCollege(event.target.value)}><option value="">Choose an existing college</option>{colleges.map(item => <option key={item.id} value={item.id}>{item.name} ({item.slug}){item.active ? '' : ' (suspended)'}</option>)}</select></label>}
             <div className="empty"><BookOpen size={36}/><h3>Select a college to get started</h3><p>You can add a course from scratch or upload a PDF after selecting a college.</p></div>
+            <h3 className="notes-heading">Study notes</h3><div className="course-options"><NotesCards onOpen={openNotes}/></div>
         </section>;
     if (!courses.length)
-        return <section className="panel"><div className="section-title"><div><h2>Courses</h2><p className="muted">{college?.name}</p></div>{can('courses', 'create') && <button className="primary" disabled={busy} onClick={() => setModal('course')}><Plus size={16}/> Add course</button>}</div><div className="empty"><BookOpen size={36}/><h3>No courses yet</h3><p>{can('courses', 'create') ? 'Add your first course from scratch or from a PDF.' : 'Published courses will appear here.'}</p></div></section>;
+        return <section className="panel"><div className="section-title"><div><h2>Courses</h2><p className="muted">{college?.name}</p></div>{can('courses', 'create') && <button className="primary" disabled={busy} onClick={() => setModal('course')}><Plus size={16}/> Add course</button>}</div><div className="empty"><BookOpen size={36}/><h3>No courses yet</h3><p>{can('courses', 'create') ? 'Add your first course from scratch or from a PDF.' : 'Published courses will appear here.'}</p></div><h3 className="notes-heading">Study notes</h3><div className="course-options"><NotesCards onOpen={openNotes}/></div></section>;
     if (!course)
         return <section>
             <div className="section-title"><div><h2>Courses</h2><p className="muted">Choose a course to start reading.</p></div><span className="row-actions"><span>{courses.length} course{courses.length !== 1 ? 's' : ''}</span>{can('courses', 'create') && <button className="primary" disabled={busy} onClick={() => setModal('course')}><Plus size={16}/> Add course</button>}</span></div>
+            <h3 className="notes-heading">Study notes</h3>
+            <div className="course-options"><NotesCards onOpen={openNotes}/></div>
+            <h3 className="notes-heading">College courses</h3>
             <PaginatedItems className="course-options">{courses.map(c => {
                 const count = c.modules.reduce((n, m) => n + visibleLessons(m.lessons).length, 0);
                 return <button key={c.id} className="course-option" onClick={() => setParams({ course: c.id })}>

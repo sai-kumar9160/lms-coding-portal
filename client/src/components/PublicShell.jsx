@@ -4,7 +4,7 @@ import { ChevronDown, GraduationCap, Menu, X } from 'lucide-react';
 import '../landing.css';
 
 // Menu wording (routes stay the same): learners, institutions, partners (vendors), tracks (paths) and our story (about).
-const navLinks = [['Learners', '/students'], ['Institutions', '/institutes'], ['Partners', '/#vendors'], ['Tracks', '/paths'], ['Our story', '/about']];
+const navLinks = [['Learners', '/students'], ['Institutions', '/institutes'], ['Partners', '/#vendors'], ['Tracks', '/paths'], ['Notes', '/notes'], ['Our story', '/about']];
 
 // Links such as /#vendors point into the home page; scroll to the section after the route changes.
 function ScrollToHash() {
@@ -110,7 +110,7 @@ export function PublicShell({ children }) {
         {children}
         <footer className="lp-footer"><div className="lp-wrap lp-foot-grid">
             <div><Link to="/" className="lp-brand"><GraduationCap size={24}/> NextByte<span>.</span></Link><p>Code daily. Grow endlessly.</p></div>
-            <div><h4>Explore</h4><Link to="/students">Learners</Link><Link to="/institutes">Institutions</Link><Link to="/#vendors">Partners</Link><Link to="/paths">Tracks</Link><Link to="/about">Our story</Link></div>
+            <div><h4>Explore</h4><Link to="/students">Learners</Link><Link to="/institutes">Institutions</Link><Link to="/#vendors">Partners</Link><Link to="/paths">Tracks</Link><Link to="/notes">Notes</Link><Link to="/about">Our story</Link></div>
             <div><h4>Tracks</h4>{['Python', 'Java', 'C', 'DSA', 'SQL', 'HTML & CSS', 'React', 'Git & GitHub', 'DevOps'].map(language => <span key={language}>{language}</span>)}</div>
             <div><h4>Get in</h4><Link to="/login?mode=register">Create an account</Link><Link to="/login">Sign in</Link><Link to="/login?as=vendor">Vendor sign in</Link></div>
         </div><div className="lp-wrap lp-copy">© 2026 NextByte. Practice builds skill; we make no placement guarantees.</div></footer>

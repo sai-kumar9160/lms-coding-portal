@@ -93,17 +93,16 @@ export function AuthPage({ onLogin }) {
             setBusy(false);
         }
     }
-    return <div className="login-layout">
-    <section className="login-story">
-      <div className="brand"><GraduationCap size={32}/> NextByte<span className="brand-dot">.</span></div>
-      <div className="login-story-content"><span className="eyebrow">CODE DAILY. GROW ENDLESSLY.</span><h1>Build your coding skills, one byte at a time.</h1><p>Your challenges, your daily streak, your next breakthrough. Everything you need to master code in one hub.</p></div>
-    </section>
+    return <div className="login-layout login-centered">
+    <div className="auth-bg" aria-hidden="true"><span className="orb orb-1"/><span className="orb orb-2"/><span className="orb orb-3"/></div>
     <section className="login-panel"><div className="login-form auth-card">
+      <div className="brand auth-brand"><GraduationCap size={30}/> NextByte<span className="brand-dot">.</span></div>
       <span className="eyebrow">WELCOME TO NEXTBYTE</span>
       {vendorLogin
         ? <button type="button" className="text-button back-link" onClick={() => navigate('/')}>← Back to NextByte</button>
-        : mode === 'register' || mode === 'login'
-        ? <div className="auth-tabs"><button type="button" disabled={busy} aria-pressed={mode === 'register'} onClick={() => switchMode('register')}>Register</button><button type="button" disabled={busy} aria-pressed={mode === 'login'} onClick={() => switchMode('login')}>Sign in</button></div>
+        : mode === 'register'
+        ? <button type="button" className="text-button back-link" disabled={busy} onClick={() => switchMode('login')}>← Already have an account? Sign in</button>
+        : mode === 'login' ? null
         : <button type="button" className="text-button back-link" disabled={busy} onClick={() => { if (mode === 'reset') navigate('/', { replace: true }); switchMode('login'); }}>← Back to sign in</button>}
       <h2>{vendorLogin ? 'Vendor sign in.' : headings[mode][0]}</h2>
       <p className="muted">{vendorLogin ? 'Partner accounts are created by the platform admin. No institute code is needed.' : headings[mode][1]}</p>
@@ -116,17 +115,20 @@ export function AuthPage({ onLogin }) {
           {college.trim() && <span className={`college-hint${lookupError ? ' error' : ''}`} role="status" aria-live="polite">{lookupError || collegeName || 'Looking up institute…'}</span>}
         </label>}
         {mode === 'register' && <>
-          <div className="field-row"><label>Full name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Your full name"/></label><label>Register as<select name="role" value={role} onChange={event => setRole(event.target.value)}><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option></select></label></div>
+          <label>Full name<input name="name" required minLength={2} maxLength={100} autoComplete="name" placeholder="Your full name"/></label>
+          <div className="field-row"><label>Register as<select name="role" value={role} onChange={event => setRole(event.target.value)}><option value="STUDENT">Student</option><option value="TEACHER">Teacher</option></select></label><label>Mobile number<input name="mobileNo" type="tel" required autoComplete="tel" maxLength={25} placeholder="e.g. +919876543210"/></label></div>
           {role === 'STUDENT' && <label>Branch<select name="branchGroupId" required value={branchGroupId} disabled={!collegeName} onChange={event => setBranchGroupId(event.target.value)}><option value="">Choose your branch</option>{(lookupCurrent ? collegeLookup.branches ?? [] : []).map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select>
             <span className="college-hint">{!collegeName ? 'Enter a valid institute code to load branches.' : !collegeLookup.branches?.length ? 'No branch groups are available. Ask your institute admin to create them in Academics.' : 'You will join this branch group for assessments.'}</span>
           </label>}
-          <div className="field-row"><label>Mobile number<input name="mobileNo" type="tel" required autoComplete="tel" maxLength={25} placeholder="e.g. +919876543210"/></label><label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label></div>
-          <div className="field-row"><label>Password<PasswordInput name="password" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="At least 10 characters"/></label><label>Confirm password<PasswordInput name="confirmPassword" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="Enter it again"/></label></div>
+          <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label>
+          <label>Password<PasswordInput name="password" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="At least 10 characters"/></label>
+          <label>Confirm password<PasswordInput name="confirmPassword" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="Enter it again"/></label>
         </>}
         {(mode === 'login' || mode === 'forgot') && <label>Email address<input name="email" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com"/></label>}
         {mode === 'login' && <label>Password<PasswordInput name="password" required minLength={1} maxLength={100} autoComplete="current-password" placeholder="Enter your password"/>
-          <button type="button" className="text-button forgot-link" disabled={busy} onClick={() => switchMode('forgot')}>Forgot password?</button>
         </label>}
+        {mode === 'login' && !vendorLogin && <div className="auth-links"><button type="button" className="register-link" disabled={busy} onClick={() => switchMode('register')}>New here? Register</button><button type="button" className="text-button forgot-link" disabled={busy} onClick={() => switchMode('forgot')}>Forgot password?</button></div>}
+        {mode === 'login' && vendorLogin && <button type="button" className="text-button forgot-link" disabled={busy} onClick={() => switchMode('forgot')}>Forgot password?</button>}
         {mode === 'reset' && <div className="field-row"><label>New password<PasswordInput name="password" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="At least 10 characters"/></label><label>Confirm password<PasswordInput name="confirmPassword" required minLength={10} maxLength={100} autoComplete="new-password" placeholder="Enter it again"/></label></div>}
         <button disabled={busy || (mode === 'reset' && !resetToken) || (mode === 'register' && role === 'STUDENT' && (!collegeName || !branchGroupId))} className="primary full">{busy ? 'Please wait...' : submitLabels[mode]}<ArrowUpRight size={18}/></button>
       </form>

@@ -826,6 +826,11 @@ TOPIC_NOTES = {
     "Structure applications": "Real programs combine structs with arrays, pointers and functions: records live in arrays, are searched or sorted by a field, and are passed around by pointer.",
     "Dynamic memory": "malloc, calloc and realloc ask the system for memory while the program runs. Always check the result, use the memory, and free it exactly once.",
     "Dynamic data structures": "Linked lists, stacks, queues and trees are built from nodes allocated on the heap and connected by pointers. Each node you create must be freed when you are done.",
+    "Variables & Data Types": "A variable is a name for a value. Python decides the type (int, float, str, bool) from the value, so use int(), float() and str() to convert, and remember that / gives a float while // and % work on whole numbers.",
+    "Conditional Statements": "An if / elif / else ladder runs the first branch whose condition is true. Combine tests with and, or and not, and remember that empty values and zero count as false.",
+    "Lists, Tuples & Sets": "A list keeps order and can change, a tuple keeps order but cannot change, and a set keeps only distinct items. Slicing, sorting and the set operations (union, intersection, difference) solve most tasks.",
+    "Dictionaries": "A dictionary maps keys to values and finds a value by its key in about one step. Use get() for a safe lookup, setdefault() or a counter to group and count, and nested dictionaries for tables.",
+    "Object-Oriented Programming": "A class bundles data (attributes) with the methods that work on it. Encapsulation hides internals behind methods and properties, inheritance reuses a parent class, abstraction fixes the shape of subclasses, and polymorphism lets one call behave differently per object.",
     "Basics": "Read the input exactly as described, do the small calculation, and print the answer in the exact format shown.",
     # Python / DSA / Java
     "Conditions": "Conditions choose what to do. Test with if / elif / else and combine tests with and, or and not.",

@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpenCheck, ChevronDown, ClipboardCheck, Code2, Handshake, Library, Play, Search, ShieldCheck, Timer, Trophy, Users } from 'lucide-react';
+import { ArrowRight, BookOpenCheck, Check, ChevronDown, ClipboardCheck, Code2, Handshake, Library, Play, RotateCcw, ShieldCheck, Timer, Trophy, Users, X } from 'lucide-react';
 import { PublicShell } from '../components/PublicShell';
 
 const languages = ['Python', 'Java', 'C', 'C++', 'JavaScript'];
 const topics = ['React', 'Git & GitHub', 'Docker & CI', 'Arrays & Strings', 'Recursion', 'Sorting & Searching', 'Linked Lists', 'Stacks & Queues', 'Trees & Graphs', 'Dynamic Programming', 'SQL', 'Core Java', 'Python Basics to OOP'];
-const facts = [['120+', 'practice problems'], ['9', 'practice tracks'], ['6', 'question types'], ['1', 'private space per institute']];
+const facts = [['1,500+', 'practice problems'], ['9', 'practice tracks'], ['6', 'question types'], ['1', 'private space per institute']];
 const faqs = [
     ['Who creates the accounts?', 'Students and teachers register themselves with their institute code. A teacher can sign in once the institute admin approves the account. Institute admins and vendors are created by the platform admin; there is no public sign-up for them.'],
     ['Can another institute see our data?', 'No. Every institute has its own space for people, courses, exams and results. The only thing that crosses over is a course an admin deliberately shares with every institute, and that is read-only for others.'],
@@ -15,7 +15,7 @@ const faqs = [
 ];
 const loop = [
     { icon: BookOpenCheck, title: 'Learn', text: 'Course chapters written as web pages, with figures, code samples, video lessons and the original PDF notes. Pick up exactly where you stopped.' },
-    { icon: Code2, title: 'Practice', text: 'Solve 120+ problems in the browser, from Python and SQL to React, Git and DevOps. Run against the sample cases, then submit against hidden ones and see which cases passed.' },
+    { icon: Code2, title: 'Practice', text: 'Solve 1,500+ problems in the browser, from Python and SQL to React, Git and DevOps. Run against the sample cases, then submit against hidden ones and see which cases passed.' },
     { icon: Timer, title: 'Prove', text: 'Take timed quizzes and exams set by your teachers. The clock is kept by the server, answers autosave and objective questions are graded for you.' },
 ];
 
@@ -37,52 +37,93 @@ function ArrayLab() {
     </div>;
 }
 
-// The product window in the hero: four tabs, each showing a different part of the platform.
-const windowTabs = [
-    { label: '1. Course', file: 'python-basics/chapter-8.md', tag: 'LESSON', note: 'Chapters are web pages with figures and code, plus the original PDF notes.',
-      code: `## 8. Functions\n\nA function packages a task so you\ncan reuse it:\n\n  def area(r):\n      return 3.14159 * r * r\n\n  print(area(5))   # 78.53975`,
-      out: ['Lesson 8 of 28', 'Prerequisite met', 'Video + PDF attached', '✓ Mark complete'] },
-    { label: '2. Code', file: 'practice/two-sum.py', tag: 'PRACTICE', note: 'Write, run against the samples, then submit against hidden cases.',
-      code: `def two_sum(nums, target):\n    seen = {}\n    for i, n in enumerate(nums):\n        if target - n in seen:\n            return seen[target - n], i\n        seen[n] = i`,
-      out: ['$ run --all', 'sample 1  PASSED', 'sample 2  PASSED', 'hidden 1–5  5/5 PASSED', '✓ Accepted · 18 ms'] },
-    { label: '3. Exam', file: 'exams/midterm-java.exam', tag: 'TIMED EXAM', note: 'The server keeps the clock; answers autosave as you go.',
-      code: `Q4 (2 marks)\nWhich keyword prevents a method\nfrom being overridden?\n\n  ( ) static\n  (x) final\n  ( ) abstract\n  ( ) const`,
-      out: ['Time left  24:10', 'Answered  4 / 10', 'Autosaved just now', '→ Next question'] },
-    { label: '4. Results', file: 'results/summary', tag: 'RESULTS', note: 'Teachers and admins see scores per student, branch and exam.',
-      code: `Exam         Score   Result\nQuiz 1       8 / 10  Passed\nMidterm      31 / 40 Passed\nAssignment 2 pending grading`,
-      out: ['Best score  31 / 40', 'Pass mark   40%', 'Branch rank  top 20%', '✓ Results published'] },
+// The hero: a working copy of the coding judge. Six cases run one after another; the buggy version passes both samples and fails hidden cases.
+const judgeCases = [
+    { name: 'sample 1', input: '3 9 5' }, { name: 'sample 2', input: '-1 -5 -3' },
+    { name: 'hidden 1', input: '4 1 12' }, { name: 'hidden 2', input: '100 200 150' },
+    { name: 'hidden 3', input: '7 7 2' }, { name: 'hidden 4', input: '-8 -20 5' },
 ];
-function ProductWindow() {
-    const [active, setActive] = useState(1);
-    const tab = windowTabs[active];
-    return <div className="lp-window">
-        <div className="lp-window-bar"><i/><i/><i/><span>nextbyte :: {tab.file}</span></div>
-        <div className="lp-tabs" role="tablist">{windowTabs.map((item, i) => <button key={item.label} type="button" role="tab" aria-selected={i === active} className={i === active ? 'on' : ''} onClick={() => setActive(i)}>{item.label}</button>)}</div>
-        <div className="lp-window-meta"><b>{tab.tag}</b><span>{tab.note}</span></div>
-        <div className="lp-window-body"><pre key={`code-${active}`}>{tab.code}</pre><div className="lp-term" key={`out-${active}`}>{tab.out.map((line, i) => <span key={line} className={i === 0 ? 'first' : i === tab.out.length - 1 ? 'last' : ''}>{line}</span>)}</div></div>
-        <div className="lp-status"><span>main*</span><span>UTF-8</span><span>Judge ready</span><span>Autosaved</span></div>
+const solutions = {
+    correct: { label: 'Correct', code: 'nums = map(int, input().split())\nprint(max(nums))', run: ([a, b, c]) => Math.max(a, b, c) },
+    buggy: { label: 'Has a bug', code: 'a, b, c = map(int, input().split())\nprint(max(a, b))', run: ([a, b]) => Math.max(a, b) },
+};
+const expected = input => Math.max(...input.split(' ').map(Number));
+
+function HeroJudge() {
+    const [version, setVersion] = useState('correct');
+    const [states, setStates] = useState(() => judgeCases.map(() => 'wait'));
+    const [running, setRunning] = useState(false);
+    const timers = useRef([]);
+    const calm = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const outcome = (which, c) => solutions[which].run(c.input.split(' ').map(Number)) === expected(c.input);
+    const clear = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+    const run = which => {
+        clear();
+        const done = judgeCases.map(c => (outcome(which, c) ? 'pass' : 'fail'));
+        if (calm) { setStates(done); setRunning(false); return; }
+        setRunning(true);
+        setStates(judgeCases.map(() => 'wait'));
+        judgeCases.forEach((_, i) => {
+            timers.current.push(setTimeout(() => setStates(cur => cur.map((st, k) => (k === i ? 'run' : st))), i * 520 + 160));
+            timers.current.push(setTimeout(() => { setStates(cur => cur.map((st, k) => (k === i ? done[i] : st))); if (i === judgeCases.length - 1) setRunning(false); }, i * 520 + 520));
+        });
+    };
+    useEffect(() => { run('correct'); return clear; }, []);
+    const pick = which => { setVersion(which); run(which); };
+    const finished = states.every(st => st === 'pass' || st === 'fail');
+    const passed = states.filter(st => st === 'pass').length;
+    const firstFail = judgeCases.findIndex((_, i) => states[i] === 'fail');
+    return <div className="lp-judge" id="judge">
+        <header><div><strong>Largest of Three</strong><span>Read three integers and print the largest one.</span></div>
+            <div className="lp-seg" role="group" aria-label="Choose a solution">{Object.entries(solutions).map(([key, v]) => <button key={key} type="button" className={version === key ? 'on' : ''} aria-pressed={version === key} onClick={() => pick(key)}>{v.label}</button>)}</div></header>
+        <div className="lp-judge-body">
+            <pre aria-label="Python solution">{solutions[version].code.split('\n').map((line, i) => <span key={i}><i>{i + 1}</i>{line}{'\n'}</span>)}</pre>
+            <ol className="lp-cases" aria-live="polite">{judgeCases.map((c, i) => <li key={c.name} className={states[i]}>
+                <span className="lp-glyph" aria-hidden>{states[i] === 'pass' ? <Check size={13}/> : states[i] === 'fail' ? <X size={13}/> : null}</span>
+                <b>{c.name}</b><code>{c.input}</code><em>{states[i] === 'pass' ? 'passed' : states[i] === 'fail' ? 'wrong' : states[i] === 'run' ? 'running' : 'queued'}</em></li>)}</ol>
+        </div>
+        <footer className={finished ? (passed === judgeCases.length ? 'good' : 'bad') : ''}>
+            <div>{finished ? <><strong>{passed === judgeCases.length ? 'Accepted' : 'Wrong answer'}</strong><span>{passed === judgeCases.length ? `${passed} of ${judgeCases.length} cases passed` : `${passed} of ${judgeCases.length} passed. ${judgeCases[firstFail].name}: expected ${expected(judgeCases[firstFail].input)}, got ${solutions[version].run(judgeCases[firstFail].input.split(' ').map(Number))}`}</span></>
+                : <><strong>Judging</strong><span>Running against the samples, then the hidden cases</span></>}</div>
+            <button type="button" onClick={() => run(version)} disabled={running}><RotateCcw size={14}/> Run again</button>
+        </footer>
+    </div>;
+}
+
+// One small card under the judge: the course you are in.
+function HeroCards() {
+    return <div className="lp-hero-cards">
+        <article className="lp-course" aria-label="Course preview">
+            <small>Course</small>
+            <strong>Python Basics to OOP</strong>
+            <span>Chapter 8 of 28</span>
+            <div className="lp-bar"><i style={{ width: '29%' }}/></div>
+            <div className="lp-course-foot"><span>29% complete</span><Link to="/login?mode=register">Resume <ArrowRight size={14}/></Link></div>
+        </article>
     </div>;
 }
 
 export function HomePage() {
     return <PublicShell>
         <section className="lp-hero"><div className="lp-wrap lp-hero-grid">
-            <div>
-                <p className="lp-pill"><b>NEW</b> Timed exams &amp; the coding judge are live</p>
-                <h1>Write real code. <em>Build real skill.</em></h1>
-                <p className="lp-lead">Courses to read, a browser coding judge with 120+ problems and timed exams, all in one place. Learn at your own pace, practise a little every day and prove what you can do.</p>
+            <div className="lp-hero-copy">
+                <h1>Practice until the judge says Accepted.</h1>
+                <p className="lp-lead">Over 1,500 coding problems judged in your browser, courses you read at your own pace and timed exams your institute runs. Pick a problem, run it, and see exactly which cases failed.</p>
                 <div className="lp-cta"><Link to="/login?mode=register" className="lp-btn big">Start learning free <ArrowRight size={18}/></Link><a href="#try" className="lp-btn ghost big"><Play size={16}/> Try the simulator</a></div>
-                <form className="lp-search" role="search" onSubmit={event => event.preventDefault()}><Search size={16}/><input aria-label="Search" placeholder="Search lectures, problems, quizzes… (sign in to search)" disabled/></form>
-                <ul className="lp-chips">{topics.slice(0, 3).map(topic => <li key={topic}>{topic}</li>)}</ul>
+                <ul className="lp-proof"><li>Nothing to install</li><li>Free for students</li><li>Each institute's data stays private</li></ul>
             </div>
-            <div className="lp-mock">
-                <ProductWindow/>
-                <div className="lp-float"><span className="lp-tag">COURSE</span><strong>Python Basics to OOP</strong><small>Chapter 8 of 28</small><div className="lp-bar"><i style={{ width: '29%' }}/></div><div className="lp-float-foot"><span>29% complete</span><span>Resume →</span></div></div>
-            </div>
+            <div className="lp-stage"><HeroJudge/><HeroCards/></div>
         </div>
         <div className="lp-marquee" id="tracks" aria-label="Languages and topics"><div>{[...languages, ...topics, ...languages, ...topics].map((item, i) => <span key={i}>{item}</span>)}</div></div></section>
 
         <section className="lp-facts" aria-label="At a glance"><div className="lp-wrap">{facts.map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}</div></section>
+
+        <section className="lp-section" id="people"><div className="lp-wrap lp-two lp-photo-row">
+            <div><h2>Built for the whole campus.</h2><p className="lp-sub">Students practise, teachers set the work, and the institute keeps it all in one private space.</p>
+                <ul className="lp-list"><li><Code2 size={18}/> <span><b>Students</b> read a chapter, solve a problem and take the exam, then see which cases failed.</span></li><li><ClipboardCheck size={18}/> <span><b>Teachers</b> build courses, set timed exams for a branch and read results per student.</span></li><li><ShieldCheck size={18}/> <span><b>Institutes</b> get a private space for people, courses and exams, with a record of every change.</span></li></ul></div>
+            <figure className="lp-photo"><img src="/images/students-laptop.jpg" alt="A group of students gathered around a laptop in a lecture hall, working on a problem together" width="1600" height="900" loading="lazy"/>
+                <figcaption>Photo by <a href="https://unsplash.com/photos/diverse-group-of-students-gathered-around-laptop-kp7qkHTgSKc" target="_blank" rel="noreferrer">Vitaly Gariev</a> on Unsplash</figcaption></figure>
+        </div></section>
 
         <section className="lp-section" id="students"><div className="lp-wrap">
             <p className="lp-eyebrow">FOR STUDENTS</p><h2>Learn it. Code it. Prove it.</h2><p className="lp-sub">Every course follows the same loop, so you always know what to do next.</p>

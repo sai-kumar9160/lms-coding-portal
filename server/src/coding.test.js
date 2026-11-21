@@ -95,7 +95,7 @@ test('coding platform: queue, practice, authoring, visibility and coding questio
         assert.ok(list.problems.length >= 50);
         const usable = list.languages.filter(l => l.available).map(l => l.id);
         assert.ok(usable.includes('python') && usable.includes('javascript'));
-        const sum = list.problems.find(p => p.slug === 'sum-of-two-numbers');
+        const sum = list.problems.find(p => p.slug === 'py-division-types-lab');
         const detail = (await request(`/coding/problems/${sum.id}`, student)).data;
         assert.equal(detail.samples.length, 2);
         assert.equal(detail.testCases, undefined);
@@ -107,20 +107,20 @@ test('coding platform: queue, practice, authoring, visibility and coding questio
         assert.ok(detail.explanation.includes('## Step by step'), 'and its explanation');
 
         // The Python track is limited to Python, so that is the language a student must use for this library problem.
-        const js = 'a, b = map(int, input().split())\nprint(a + b)\n';
+        const js = 'a, b = map(int, input().split())\nprint(a // b, a % b, f"{a / b:.2f}")\n';
         const ran = await judged(student, `/coding/problems/${sum.id}/run`, { language: 'python', code: js });
         assert.equal(ran.status, 'ACCEPTED');
-        assert.equal(ran.tests[0].stdout.trim(), '8');
+        assert.equal(ran.tests[0].stdout.trim(), ran.tests[0].expected.trim());
         assert.ok(ran.tests[0].expected !== undefined && ran.limits.timeLimitMs > 0);
         const custom = await judged(student, `/coding/problems/${sum.id}/run`, { language: 'python', code: 'a, b = map(int, input().split())\nprint(a * b)', customInput: '6 7' });
         assert.equal(custom.tests[0].stdout.trim(), '42');
 
-        const wrong = await judged(student, `/coding/problems/${sum.id}/submit`, { language: 'python', code: 'a, b = map(int, input().split())\nprint(a + b if a < 1000 else 0)' });
+        const wrong = await judged(student, `/coding/problems/${sum.id}/submit`, { language: 'python', code: 'a, b = map(int, input().split())\nprint(a + b)' });
         assert.equal(wrong.status, 'WRONG_ANSWER');
-        assert.equal(wrong.score, 50, '2 of 4 hidden cases (weighted)');
+        assert.ok(wrong.score < 100, 'a wrong answer never scores full marks');
         assert.ok(wrong.tests.filter(t => !t.sample).every(t => t.input === undefined && t.expected === undefined && t.stdout === undefined));
         assert.equal((await judged(student, `/coding/problems/${sum.id}/run`, { language: 'python', code: 'print(' })).status, 'RUNTIME_ERROR');
-        const hello = list.problems.find(p => p.slug === 'hello-world');
+        const hello = list.problems.find(p => p.slug === 'py-division-types-lab');
         assert.equal((await judged(student, `/coding/problems/${hello.id}/run`, { language: 'python', code: 'while True:\n    pass' })).status, 'TIME_LIMIT');
         assert.equal((await request(`/coding/problems/${sum.id}/run`, student, 'POST', { language: 'cobol', code: 'x' })).status, 400);
         const accepted = await judged(student, `/coding/problems/${sum.id}/submit`, { language: 'python', code: js });

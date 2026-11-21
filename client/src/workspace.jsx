@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { request, setCollegeContext } from './api';
+import { clearAuth, request, setCollegeContext } from './api';
 
 // The Super Admin's chosen college is remembered for this browser tab only.
 const COLLEGE_KEY = 'lms-work-college';
@@ -69,7 +69,8 @@ export function WorkspaceProvider({ onSignedOut, children }) {
             setBusy(false);
         }
     }
-    const logout = () => act(async () => { await api('/auth/logout', 'POST'); onSignedOut(); });
+    // Always leave for the login page, even if the server call fails (for example an expired session).
+    const logout = () => act(async () => { try { await api('/auth/logout', 'POST'); } finally { clearAuth(); onSignedOut(); } });
     if (!user)
         return <div className="loading">{error || 'Opening your campus…'}</div>;
     // can('courses', 'update') mirrors the server's requirePermission checks, to show or hide actions.

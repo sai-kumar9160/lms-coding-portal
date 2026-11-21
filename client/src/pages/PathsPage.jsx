@@ -1,21 +1,22 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Atom, Braces, Code2, Database, FileCode2, GitBranch, Globe, Network, Rocket, Server, Target, Trophy } from 'lucide-react';
 import { PublicShell } from '../components/PublicShell';
 
 // One card per practice track. The problem counts and sample titles match the problems shipped with the platform.
 const paths = [
-    { icon: Code2, name: 'Python', count: '55 problems', level: 'Beginner friendly', tagline: 'Your first language, done properly.',
-      text: 'Start with input and output, then loops, strings, lists and dictionaries, and finish with recursion, dynamic programming and backtracking. Each step is a small program you can run in seconds.',
-      learn: ['Variables, conditions and loops', 'Strings, lists and matrices', 'Number theory and patterns', 'Recursion and dynamic programming'], samples: ['Hello, World!', 'Prime Check', 'Pascal’s Triangle', 'Coin Change'] },
-    { icon: Braces, name: 'C', count: '7 problems', level: 'Core fundamentals', tagline: 'Understand what the computer is doing.',
+    { icon: Code2, name: 'Python', count: '500 problems', level: 'Beginner friendly', tagline: 'Your first language, done properly.',
+      text: '500 scenario problems in seven topics: variables, conditions, loops, lists, tuples and sets, dictionaries, functions and object-oriented programming. Each step is a small program you can run in seconds.',
+      learn: ['Variables, conditions and loops', 'Lists, tuples, sets and dictionaries', 'Functions, lambdas and decorators', 'Classes, inheritance and polymorphism'], samples: ['Fuel Tank in Gallons', 'Loan Eligibility Check', 'Word Frequency Counter', 'Memoised Fibonacci'] },
+    { icon: Braces, name: 'C', count: '487 problems', level: 'Core fundamentals', tagline: 'Understand what the computer is doing.',
       text: 'Pointers, arrays, strings and structs in the language that shows you how memory really works. If you can write C, every other language gets easier to read.',
       learn: ['printf, scanf and the main function', 'Pointers and swapping through them', 'Arrays and string handling', 'Recursion and struct'], samples: ['Swap with Pointers', 'Reverse an Array', 'Factorial by Recursion', 'Class Topper (struct)'] },
-    { icon: FileCode2, name: 'Java', count: '7 problems', level: 'Campus favourite', tagline: 'Think in objects.',
+    { icon: FileCode2, name: 'Java', count: '497 problems', level: 'Campus favourite', tagline: 'Think in objects.',
       text: 'Classes, objects, collections, inheritance and polymorphism: the Java that campus exams and interviews ask for, practised on real programs instead of slides.',
       learn: ['Classes, objects and constructors', 'Strings and StringBuilder', 'ArrayList and Collections', 'Inheritance and abstract classes'], samples: ['Rectangle Class', 'Sort in Descending Order', 'Fibonacci by Recursion', 'Shapes and Polymorphism'] },
     { icon: Network, name: 'DSA', count: '8 problems', level: 'Interview ready', tagline: 'The patterns behind every interview.',
       text: 'Linked lists, trees, graphs, stacks, queues, intervals and hashing. Solve them in any language you like; the judge only cares that the answer is right and fast enough.',
-      learn: ['Linked lists and binary search trees', 'Graph search with BFS', 'Stacks and queues', 'Sorting, hashing and cycle detection'], samples: ['Reverse a Linked List', 'Shortest Path (BFS)', 'Queue Using Two Stacks', 'Detect a Cycle'] },
+      learn: ['Linked lists and binary search trees', 'Graph search with BFS', 'Stacks and queues', 'Sorting, hashing and cycle detection'], samples: ['Reverse a Linked List', 'Shortest Path in a Graph (BFS)', 'Queue Using Two Stacks', 'Detect a Cycle in a Directed Graph'] },
     { icon: Database, name: 'SQL', count: '8 problems', level: 'Every developer needs it', tagline: 'Ask your data better questions.',
       text: 'Write real queries against real tables. Filter, sort, group, join and find what is missing; each problem runs your query on fresh data, so only a correct query passes.',
       learn: ['SELECT, WHERE and ORDER BY', 'GROUP BY and HAVING', 'JOIN and LEFT JOIN', 'Finding rows that do not match'], samples: ['High Earners', 'Top Three Salaries', 'Headcount per Department', 'Customers Who Never Ordered'] },
@@ -39,16 +40,35 @@ const roadmap = [
     ['Week 4: Prove it', 'Take the timed quiz or exam your teacher sets and see how far a month of practice has taken you.'],
 ];
 
+// The hero: pick a path and see the first stops on it. The stops are real problems from that track, in the order you meet them.
+function PathPicker() {
+    const [open, setOpen] = useState(0);
+    const path = paths[open];
+    const Icon = path.icon;
+    return <div className="lp-picker">
+        <div className="lp-picker-tabs" role="tablist" aria-label="Practice paths">{paths.map((item, i) => { const TabIcon = item.icon; return <button key={item.name} type="button" role="tab" aria-selected={i === open} className={i === open ? 'on' : ''} onClick={() => setOpen(i)}><TabIcon size={15}/>{item.name}</button>; })}</div>
+        <div className="lp-picker-body" key={path.name}>
+            <div className="lp-picker-head"><span className="lp-path-icon"><Icon size={22}/></span><div><h3>{path.name}</h3><small>{path.count} &middot; {path.level}</small></div></div>
+            <p>{path.tagline}</p>
+            <ol className="lp-stops">{path.samples.map((title, i) => <li key={title} className={i === 0 ? 'first' : ''}><span aria-hidden>{i + 1}</span><div><strong>{title}</strong>{i === 0 && <small>Start here</small>}</div></li>)}</ol>
+            <Link to="/login?mode=register" className="lp-textlink">Start the {path.name} path <ArrowRight size={16}/></Link>
+        </div>
+    </div>;
+}
+
 export function PathsPage() {
     return <PublicShell>
-        <section className="lp-hero lp-page-hero"><div className="lp-wrap lp-center">
-            <p className="lp-pill"><b>PATHS</b> Nine ways to start. One way to keep going.</p>
-            <h1>Pick a path. <em>Take the next step today.</em></h1>
-            <p className="lp-lead">Nobody becomes a developer in a day, and nobody has to. Choose a path, solve one problem, and let tomorrow’s problem be a little easier than today’s.</p>
-            <div className="lp-cta lp-cta-center"><Link to="/login?mode=register" className="lp-btn big">Start your first path <ArrowRight size={18}/></Link><a href="#paths" className="lp-btn ghost big">Browse the paths</a></div>
+        <section className="lp-hero lp-page-hero lp-paths-hero"><div className="lp-wrap lp-hero-grid">
+            <div className="lp-hero-copy">
+                <h1>Pick a path.<br/><em>Take the next step today.</em></h1>
+                <p className="lp-lead">Nobody becomes a developer in a day, and nobody has to. Choose a path, solve one problem, and let tomorrow’s problem be a little easier than today’s.</p>
+                <div className="lp-cta"><Link to="/login?mode=register" className="lp-btn big">Start your first path <ArrowRight size={18}/></Link><a href="#paths" className="lp-btn ghost big">Browse the paths</a></div>
+                <ul className="lp-proof"><li>Nine practice paths</li><li>Easy to hard, in order</li><li>Code in your browser</li></ul>
+            </div>
+            <PathPicker/>
         </div></section>
 
-        <section className="lp-facts" aria-label="At a glance"><div className="lp-wrap">{[['9', 'practice paths'], ['120+', 'problems to solve'], ['0', 'setup: code in your browser'], ['1', 'problem is enough for today']].map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}</div></section>
+        <section className="lp-facts" aria-label="At a glance"><div className="lp-wrap">{[['9', 'practice paths'], ['1,500+', 'problems to solve'], ['0', 'setup: code in your browser'], ['1', 'problem is enough for today']].map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}</div></section>
 
         <section className="lp-section" id="paths"><div className="lp-wrap">
             <p className="lp-eyebrow">CHOOSE YOUR PATH</p><h2>Every path starts at the very beginning.</h2><p className="lp-sub">Problems are ordered from easy to hard, with sample cases to learn from and hidden cases to prove it.</p>

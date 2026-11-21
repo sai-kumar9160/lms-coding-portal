@@ -2,7 +2,7 @@ import { PaginatedTable, PaginatedItems } from '../components/Pagination';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileCode2, Gauge, Play, RotateCcw, Send, Shuffle, Plus } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, CircleDot, Clock, FileCode2, Gauge, Play, RotateCcw, Send, Shuffle, Plus } from 'lucide-react';
 import { useWorkspace } from '../workspace';
 import { CodeEditor } from '../components/CodeEditor';
 import { JudgeResult, VERDICTS, judgeCode, verdictLabel } from '../components/JudgeResult';
@@ -35,8 +35,9 @@ export function CodingPage() {
     if (isSuper && !inCollege) return <ProblemManager languages={library.languages} onChanged={load}/>;
     const summary = slug && library.problems.find(p => p.slug === slug);
     if (slug && summary)
-        return <ProblemWorkspace key={summary.id} summary={summary} library={library} onBack={() => open(null)} onSubmitted={load}/>;
-    return <ProblemList library={library} onOpen={open} onChanged={load}/>;
+        return <ProblemWorkspace key={summary.id} summary={summary} library={library} onBack={() => setParams({ track: summary.track ?? 'General' })} onSubmitted={load}/>;
+    // Back from a problem lands on that language's problem list, not the language chooser.
+    return <ProblemList library={library} initialTrack={params.get('track') || ''} onOpen={open} onChanged={load}/>;
 }
 
 // One card per language / track on the practice home; clicking a card opens that track's problems.
@@ -61,7 +62,11 @@ function TrackCards({ library, tracks, onPick }) {
         const solved = items.filter(p => p.state === 'SOLVED').length;
         const look = TRACK_LOOK[track] ?? TRACK_LOOK.General;
         return <button key={track} type="button" className="track-card" style={{ '--track': look.color }} onClick={() => onPick(track)}>
-            <span className="track-badge">{look.badge}</span>
+            <span className="track-top">
+                <span className="track-badge">{look.badge}</span>
+                <span className="track-total">{items.length} problems</span>
+                <ArrowRight className="track-go" size={16} aria-hidden="true"/>
+            </span>
             <strong>{track}</strong>
             <span className="track-about">{look.about}</span>
             <span className="track-progress"><i style={{ width: `${percent(solved, items.length)}%` }}/></span>
@@ -70,11 +75,11 @@ function TrackCards({ library, tracks, onPick }) {
     })}</div>;
 }
 
-function ProblemList({ library, onOpen, onChanged }) {
+function ProblemList({ library, initialTrack = '', onOpen, onChanged }) {
     const { can } = useWorkspace();
     const [tab, setTab] = useState('problems');
     const [addingProblem, setAddingProblem] = useState(false);
-    const [filter, setFilter] = useState({ search: '', difficulty: '', topic: '', state: '', track: '' });
+    const [filter, setFilter] = useState({ search: '', difficulty: '', topic: '', state: '', track: library.problems.some(p => (p.track ?? 'General') === initialTrack) ? initialTrack : '' });
     const topics = useMemo(() => [...new Set(library.problems.filter(p => !filter.track || p.track === filter.track).map(p => p.topic))].sort(), [library, filter.track]);
     const shown = library.problems.filter(p =>
         (!filter.search || `${p.title} ${p.topic}`.toLowerCase().includes(filter.search.toLowerCase()))
@@ -88,12 +93,14 @@ function ProblemList({ library, onOpen, onChanged }) {
     const count = state => library.problems.filter(p => p.state === state).length;
     const change = field => event => setFilter(current => ({ ...current, [field]: event.target.value }));
     const unsolved = library.problems.filter(p => p.state !== 'SOLVED');
+    // The top cards: Solved / Attempted list those problems across every language; Overall progress goes back to the language cards.
+    const showState = state => { setTab('problems'); setFilter({ search: '', difficulty: '', topic: '', state, track: '' }); };
     return <>
         <div className="page-heading"><div><h1>Coding practice</h1><p className="muted">Solve challenges and build your coding skills.</p></div>{can('coding', 'update') && can('coding', 'create') && <button className="primary" onClick={() => { setAddingProblem(true); setTab('manage'); }}><Plus size={16}/> Add problem</button>}</div>
         <div className="stats coding-stats">
-            <div className="stat"><div className="stat-icon"><CheckCircle2 size={20}/></div><div><small>Solved</small><strong>{count('SOLVED')} / {library.problems.length}</strong></div></div>
-            <div className="stat"><div className="stat-icon"><CircleDot size={20}/></div><div><small>Attempted</small><strong>{count('ATTEMPTED')}</strong></div></div>
-            <div className="stat"><div className="stat-icon"><Gauge size={20}/></div><div><small>Overall progress</small><strong>{percent(count('SOLVED'), library.problems.length)}%</strong><span className="stat-bar"><i style={{ width: `${percent(count('SOLVED'), library.problems.length)}%` }}/></span></div></div>
+            <button type="button" className={`stat stat-link${filter.state === 'SOLVED' && !filter.track ? ' open' : ''}`} onClick={() => showState('SOLVED')}><div className="stat-icon"><CheckCircle2 size={20}/></div><div><small>Solved</small><strong>{count('SOLVED')} / {library.problems.length}</strong></div></button>
+            <button type="button" className={`stat stat-link${filter.state === 'ATTEMPTED' && !filter.track ? ' open' : ''}`} onClick={() => showState('ATTEMPTED')}><div className="stat-icon"><CircleDot size={20}/></div><div><small>Attempted</small><strong>{count('ATTEMPTED')}</strong></div></button>
+            <button type="button" className={`stat stat-link${!filter.state && !filter.track && !filter.search ? ' open' : ''}`} onClick={() => showState('')}><div className="stat-icon"><Gauge size={20}/></div><div><small>Overall progress</small><strong>{percent(count('SOLVED'), library.problems.length)}%</strong><span className="stat-bar"><i style={{ width: `${percent(count('SOLVED'), library.problems.length)}%` }}/></span></div></button>
         </div>
         {!library.languages.some(l => l.available) && <div className="alert">Running code is turned off on this server. You can read the problems, but Run and Submit are unavailable.</div>}
         <div className="course-tabs" role="tablist">
@@ -104,14 +111,14 @@ function ProblemList({ library, onOpen, onChanged }) {
         </div>
         {tab === 'manage' ? <ProblemManager key={addingProblem ? 'add' : 'manage'} initiallyCreating={addingProblem} languages={library.languages} onChanged={onChanged}/>
             : tab !== 'problems' ? <Submissions everyone={tab === 'all'} onOpen={onOpen} problems={library.problems}/>
-            : !filter.track && !filter.search ? <section className="panel">
+            : !filter.track && !filter.search && !filter.state ? <section className="panel">
                 <div className="track-intro"><h2>Choose a language</h2><label className="track-search"><input value={filter.search} onChange={change('search')} placeholder="Or search every problem by name or topic"/></label></div>
                 <TrackCards library={library} tracks={tracks} onPick={track => setFilter(current => ({ ...current, track, topic: '' }))}/>
             </section>
             : <section className="panel">
                 <div className="track-head">
                     <button type="button" className="text-button" onClick={() => setFilter({ search: '', difficulty: '', topic: '', state: '', track: '' })}><ArrowLeft size={14}/> All languages</button>
-                    <h2>{filter.track || 'Search results'}</h2>
+                    <h2>{filter.track || (filter.state === 'SOLVED' ? 'Solved problems' : filter.state === 'ATTEMPTED' ? 'Attempted problems' : 'Search results')}</h2>
                     <span className="muted">{shown.length} problem{shown.length === 1 ? '' : 's'}</span>
                 </div>
                 <div className="audit-filters">
@@ -146,13 +153,13 @@ function Submissions({ everyone, problemId, problems = [], onOpen, onLoadCode, r
     if (!rows) return <div className="loading">Loading submissions...</div>;
     if (!rows.length) return <div className="empty"><h3>No submissions yet</h3><p>Submitted solutions appear here.</p></div>;
     const slugOf = id => problems.find(p => p.id === id)?.slug;
-    return <section className={problemId ? '' : 'panel'}><div className="table-wrap"><PaginatedTable>
+    return <section className={problemId ? '' : 'panel'}><div className="table-wrap"><PaginatedTable className="sub-table">
         <thead><tr><th>When</th>{everyone && <th>Student</th>}{!problemId && <th>Problem</th>}<th>Language</th><th>Result</th><th>Score</th><th>Tests</th><th>Time</th>{onLoadCode && <th></th>}</tr></thead>
         <tbody>{rows.map(row => <tr key={row.id}>
-            <td>{when(row.createdAt)}</td>
+            <td className="sub-when">{when(row.createdAt)}</td>
             {everyone && <td><strong>{row.user?.name}</strong><br/><small className="muted">{row.user?.email}</small></td>}
             {!problemId && <td>{onOpen && slugOf(row.problemId) ? <button className="text-button" onClick={() => onOpen(slugOf(row.problemId))}>{row.problem.title}</button> : row.problem.title}</td>}
-            <td>{row.language}</td>
+            <td><span className="lang-chip">{row.language}</span></td>
             <td><StatusTag status={row.status} jobStatus={row.jobStatus}/></td>
             <td>{row.score ?? '-'} / {row.maxScore}</td>
             <td>{row.passedCount} / {row.totalCount}</td>
