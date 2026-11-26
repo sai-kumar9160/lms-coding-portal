@@ -28,10 +28,13 @@ pg.types.setTypeParser(pg.types.builtins.DATE, value => new Date(`${value}T00:00
 pg.types.setTypeParser(pg.types.builtins.INT8, value => Number(value));
 
 // One pool per process: up to CONNECTION_LIMIT connections, shared by controllers, models and the session store.
+const sslMode = connectionUrl.searchParams.get('sslmode');
+const useSsl = process.env.DB_SSL === 'true' || (sslMode && sslMode !== 'disable');
 export const pool = new pg.Pool({
     host: DB_HOST_NAME, port: DB_PORT, user: USER, password: PWD, database: DATABASE,
     max: CONNECTION_LIMIT, connectionTimeoutMillis: POOL_TIMEOUT * 1000,
     options: '-c timezone=UTC',
+    ...(useSsl ? { ssl: { rejectUnauthorized: sslMode === 'verify-full' || sslMode === 'verify-ca' } } : {}),
 });
 pool.on('error', error => console.error('Unexpected PostgreSQL pool error:', error.message));
 

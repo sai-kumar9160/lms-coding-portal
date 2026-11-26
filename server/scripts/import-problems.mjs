@@ -11,7 +11,7 @@ const source = fileURLToPath(new URL('../data/coding/problems.json', import.meta
 
 export async function importProblems() {
     const problems = JSON.parse(fs.readFileSync(source, 'utf8'));
-    for (const p of problems) {
+    const upsertOne = async p => {
         await db.transaction(async tx => {
             // Library problems are validated by build-problems.py (reference solutions produce every expected output).
             const { id } = await tx.one(
@@ -25,11 +25,18 @@ export async function importProblems() {
                 [p.slug, p.title, p.difficulty, p.topic, p.track ?? 'General', p.statement, p.inputFormat, p.outputFormat, p.constraints, p.sequence, new Date(), p.language ?? 'python', p.solution,
                     p.languages ? JSON.stringify(p.languages) : null, p.checker ?? null, p.starters ? JSON.stringify(p.starters) : null, p.pseudocode ?? null, p.explanation ?? null]);
             await tx.run('DELETE FROM cdng_tst_cs_lst_t WHERE cdng_prblm_id = $1', [id]);
-            for (const [i, t] of p.tests.entries())
+            if (p.tests.length > 0) {
                 await tx.run(
-                    `INSERT INTO cdng_tst_cs_lst_t (cdng_tst_cs_id, cdng_prblm_id, input_tx, expected_output_tx, is_sample_in, sqnce_id) VALUES (DEFAULT, $1, $2, $3, $4, $5)`,
-                    [id, t.input, t.output, t.sample ? 1 : 0, i]);
+                    `INSERT INTO cdng_tst_cs_lst_t (cdng_prblm_id, input_tx, expected_output_tx, is_sample_in, sqnce_id)
+                     SELECT $1, t.input_tx, t.expected_output_tx, t.is_sample_in, t.sqnce_id
+                     FROM UNNEST($2::text[], $3::text[], $4::int[], $5::int[]) AS t(input_tx, expected_output_tx, is_sample_in, sqnce_id)`,
+                    [id, p.tests.map(t => t.input), p.tests.map(t => t.output), p.tests.map(t => (t.sample ? 1 : 0)), p.tests.map((_, i) => i)]);
+            }
         });
+    };
+    const concurrency = 8;
+    for (let i = 0; i < problems.length; i += concurrency) {
+        await Promise.all(problems.slice(i, i + concurrency).map(upsertOne));
     }
     return problems.length;
 }
